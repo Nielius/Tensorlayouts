@@ -2,32 +2,7 @@ import Aesop
 import Tensorlayouts.ArithHelpers
 import Mathlib.Data.List.Basic -- needed for e.g. List.scanr_nil; this is part of simp
 
-def PosInt := { n : Nat // n > 0 }
--- problem with this approach:
--- many things that work with Nat (e.g. omega)
--- don't seem to work automatically with PosInt; e.g. commutativity of multiplication
-
-
-deriving instance Repr for PosInt
-deriving instance DecidableEq for PosInt
-
-instance : Coe PosInt Nat :=
-  ⟨Subtype.val⟩
-
-instance : Add PosInt where
-  add a b := ⟨a + b, by refine Nat.add_pos_left a.property b.val⟩
-
-instance : HMul PosInt PosInt PosInt where
-  hMul a b := ⟨a * b, Nat.mul_pos a.property b.property⟩
-
-theorem PosInt.mul_comm (a b : PosInt) : a * b = b * a := by
-  unfold HMul.hMul
-  unfold instHMulPosInt
-  simp
-  have h : a.val * b.val = b.val * a.val := by
-    exact Nat.mul_comm a.val b.val
-  simp [h]
-
+/-- ## Shape and Stride -/
 
 def Shape :=  List PosInt
 def Stride := List PosInt
@@ -45,13 +20,41 @@ instance : GetElem Shape Nat PosInt (fun s i => i < s.length) where
 instance : GetElem Stride Nat PosInt (fun s i => i < s.length) where
   getElem s i h := s.get ⟨i, h⟩
 
-
-
 def Shape.toNats (l : Shape) : List Nat :=
   List.map (fun (x: PosInt) => (x : Nat)) l
 def Stride.toNats (l : Stride) : List Nat :=
   List.map (fun (x: PosInt) => (x : Nat)) l
 
+def Stride.from_shape (shape : Shape) : Stride :=
+  List.tail (List.scanr (· * ·) ⟨1, by simp⟩ shape)
+
+#eval Stride.from_shape [⟨2, by simp⟩, ⟨3, by simp⟩, ⟨54, by simp⟩]
+
+
+/-- ## Indexing for shapes -/
+
+def Shape.max_index (shape : Shape) : Nat :=
+  Nat.prod shape.toNats
+
+/--
+Returns whether an index is valid for a given shape by checking:
+1. The index length matches the shape length
+2. Each index component is less than the corresponding shape dimension
+-/
+def Shape.is_valid_index (s : Shape) (idx : List Nat) : Prop :=
+  let len_eq := idx.length = s.length
+  ∃ (hlen: len_eq),
+  ∀ (i : Nat) (h : i < idx.length),
+    idx.get ⟨i, h⟩ < s.get ⟨i, by rw [hlen] at h; exact h⟩
+
+/--
+The type of valid indices for a given shape
+-/
+def IndexSet (s : Shape) : Type :=
+  {idx : List Nat // Shape.is_valid_index s idx}
+
+
+/-- ## View -/
 
 structure View where
   shape : Shape
@@ -61,42 +64,14 @@ structure View where
 deriving instance Repr for View
 deriving instance DecidableEq for View
 
-
-
 def View.mk_unchecked (shape: Shape) (stride : Stride) : Option View :=
   if h : shape.length = stride.length then
     some ⟨shape, stride, h⟩
   else
     none
 
-
-
 def View.from_shape_unchecked (shape : Shape) : Option View :=
-  let stride := List.tail (List.reverse (List.foldr (fun x acc => acc ++ [(acc.getLastD ⟨1, by simp ⟩) * x])
-    [⟨ 1, by simp ⟩] shape))
-  View.mk_unchecked shape stride
-
-
-theorem reverse_tail {α : Type} (l : List α) (x : α) :
-  (x :: l).reverse.tail = (l.reverse ++ [x]).tail := by
-  simp
-
-
-theorem reverse_tail_length {α : Type} (l : List α) (h : l ≠ []) :
-  (l.reverse.tail).length = l.length - 1 := by
-  cases l
-  case nil =>
-    contradiction
-  case cons hd tl =>
-    rewrite [reverse_tail]
-    simp
-
-
-def Stride.from_shape (shape : Shape) : Stride :=
-  List.tail (List.scanr (· * ·) ⟨1, by simp⟩ shape)
-
-#eval Stride.from_shape [⟨2, by simp⟩, ⟨3, by simp⟩, ⟨54, by simp⟩]
-
+  View.mk_unchecked shape (Stride.from_shape shape)
 
 def View.from_shape (shape : Shape) : View := {
   shape := shape,
@@ -120,38 +95,18 @@ def View.to_index_fn_unsafe (v : View) : List Nat → Option Nat
           else
             none
 
-def Nat.prod (l : List Nat) : Nat :=
-  List.foldr (fun x acc => x * acc) 1 l
-
-
 def View.max_index (v : View) : Nat :=
-  Nat.prod v.stride.toNats
-
-/--
-Returns whether an index is valid for a given shape by checking:
-1. The index length matches the shape length
-2. Each index component is less than the corresponding shape dimension
--/
-def View.valid_index (s : Shape) (idx : List Nat) : Prop :=
-  let len_eq := idx.length = s.length
-  ∃ (hlen: len_eq),
-  ∀ (i : Nat) (h : i < idx.length),
-    idx.get ⟨i, h⟩ < s.get ⟨i, by rw [hlen] at h; exact h⟩
-
-/--
-The type of valid indices for a given shape
--/
-def IndexSet (s : Shape) : Type :=
-  {idx : List Nat // View.valid_index s idx}
-
+  v.shape.max_index
 
 def View.to_index_fn_safe (v : View) : (IndexSet v.shape) -> Nat :=
   fun ⟨idx, _⟩ => v.stride.toNats.inner_prod idx
+  -- we could add here that the result is always less than the max index
 
-
-def some_example : View :=
+example : View :=
   View.from_shape [⟨2, by simp⟩, ⟨3, by simp⟩, ⟨54, by simp⟩]
 
+
+/-- ## Unraveling -/
 
 def unravel_unsafe (s : Shape) : Nat -> List Nat :=
   fun idx =>
@@ -166,7 +121,7 @@ def unravel (s : Shape) : Nat -> IndexSet s :=
     ⟨ unravel_unsafe s idx, by
       unfold unravel_unsafe
       simp
-      unfold View.valid_index
+      unfold Shape.is_valid_index
       simp
       have hlen : min (List.length s) (View.from_shape s).stride.length = List.length s := by
         rewrite [View.from_shape_stride_shape_length_eq]
@@ -179,7 +134,6 @@ def unravel (s : Shape) : Nat -> IndexSet s :=
         omega
       exact s[i].property
     ⟩
-
 
 def View.to_unraveled_index_fn (v : View) : Nat -> Nat :=
   v.to_index_fn_safe ∘ unravel v.shape
