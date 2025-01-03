@@ -3,6 +3,15 @@ import Mathlib.Data.List.Basic -- needed for e.g. List.scanr_nil; this is part o
 def Nat.prod (l : List Nat) : Nat :=
   List.foldr (fun x acc => x * acc) 1 l
 
+theorem Nat.prod_nil : Nat.prod [] = 1 := by
+  unfold Nat.prod
+  rw [List.foldr_nil]
+
+theorem Nat.prod_cons : Nat.prod (a :: l) = a * Nat.prod l := by
+  unfold Nat.prod
+  rw [List.foldr_cons]
+
+
 def List.inner_prod {α: Type} [Mul α] [Add α] [Zero α] (l : List α) (r : List α) : α :=
    List.sum (List.zipWith (fun x y => x * y) l r)
 
@@ -25,13 +34,17 @@ instance : Add PosInt where
 instance : HMul PosInt PosInt PosInt where
   hMul a b := ⟨a * b, Nat.mul_pos a.property b.property⟩
 
+instance : Mul PosInt where
+  mul a b := ⟨a * b, Nat.mul_pos a.property b.property⟩
+
 theorem PosInt.mul_comm (a b : PosInt) : a * b = b * a := by
-  unfold HMul.hMul
-  unfold instHMulPosInt
-  simp
-  have h : a.val * b.val = b.val * a.val := by
-    exact Nat.mul_comm a.val b.val
-  simp [h]
+   unfold HMul.hMul
+   unfold instHMulPosInt
+   simp
+   have h : a.val * b.val = b.val * a.val := by
+      exact Nat.mul_comm a.val b.val
+   simp [h]
+instance : Std.Commutative (α := PosInt) (· * ·) := ⟨PosInt.mul_comm⟩
 
 
 /-- ## scanr lemmas -/
@@ -67,3 +80,11 @@ theorem List.scanr_head_eq_foldr_D {α β : Type}  (f : α → β → β) (init 
       unfold scanlist
       rw [List.scanr_cons]
       simp
+
+theorem List.scanr_cons_as_cons_scanr {α β : Type} (f : α → β → β) (init : β) (hd : α) (tl : List α) :
+  List.scanr f init (hd :: tl) =
+     let scanr_tl := List.scanr f init tl
+     (f hd (scanr_tl.headD init)) :: scanr_tl := by
+   rw [List.scanr_cons]
+   congr
+   . induction tl; all_goals simp
