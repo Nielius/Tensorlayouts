@@ -3,7 +3,10 @@ import Tensorlayouts.ArithHelpers
 import Mathlib.Data.List.Basic -- needed for e.g. List.scanr_nil; this is part of simp
 import Mathlib.Data.List.Zip -- needed for List.zipWith_map_right
 
-/-- ## Shape and Stride -/
+import Mathlib.Tactic.Zify
+open Mathlib.Tactic.Zify (zify)
+
+/- ## Shape and Stride -/
 
 def Shape :=  List PosInt
 def Stride := List PosInt
@@ -75,7 +78,7 @@ def Stride.from_shape_cons (hd : PosInt) (tl : List PosInt) :
 #eval Stride.from_shape [⟨2, by simp⟩, ⟨3, by simp⟩, ⟨54, by simp⟩]
 
 
-/-- ## Indexing for shapes -/
+/- ## Indexing for shapes -/
 
 def Shape.max_index (shape : Shape) : Nat :=
   Nat.prod shape.toNats
@@ -169,10 +172,101 @@ theorem max_index_tail_increase : ∀ (s : Shape) (s' : PosInt),
     exact s'.property
   exact Nat.le_mul_of_pos_left s.max_index h
 
+/- ## Heterogenous base -/
+
+namespace HeterogenousBase
+
 /-- back-and-forth in the heterogeneous base; mostly a helper function -/
 def heterogenous_base_bnf (s : Shape) : Nat -> Nat :=
   fun x =>
     (List.zipWith (fun shape stride => (x / stride % shape)) s.toNats (Stride.from_shape s).toNats).sum
+
+
+example (a b c : ℕ) (H1 : a = b + 1) (H2 : b = c) : a = c + 1 :=
+calc a = b + 1 := H1
+     _ = c + 1 := by rw [H2]
+
+-- calc is also available in tactic mode. You can leave ?_s to create a new goal:
+
+example (a b c : ℕ) (H1 : a = b + 1) (H2 : b = c) : a = c + 1 := by
+  calc
+    a = b + 1 := ?_
+    _ = c + 1 := ?_
+  · exact H1
+  · rw [H2]
+
+
+
+
+/--
+A representation of a number in a heterogeneous base consisting of two digits,
+including the overflow to what would be the next digit.
+
+This structure is convenient for the proof of the correctness of the heterogenous base,
+because it has just enough information to do the induction step.
+-/
+structure PairBaseRepresentation where
+  overflow: Nat
+  digit2: Nat
+  digit1: Nat
+  size2: PosInt
+  size1: PosInt
+
+def PairBaseRepresentation.to_nat : PairBaseRepresentation -> Nat :=
+  fun p =>
+    p.overflow + p.size1 * p.digit2 + p.digit1
+
+def PairBaseRepresentation.from_nat (size2 size1 : PosInt) : Nat -> PairBaseRepresentation :=
+  fun n =>
+    let digit2 := (n / size1) % size2
+    let digit1 := n % size1
+    let overflow := n - (n % (size2 * size1))
+    {overflow := overflow, digit2 := digit2, digit1 := digit1, size2 := size2, size1 := size1}
+
+set_option pp.parens true
+
+theorem PairBaseRepresentation.from_nat_to_nat : ∀ (size2 size1 : PosInt) (n : Nat),
+  PairBaseRepresentation.to_nat (PairBaseRepresentation.from_nat size2 size1 n) = n := by
+  intro size2 size1 n
+  unfold PairBaseRepresentation.from_nat
+  unfold PairBaseRepresentation.to_nat
+  simp
+
+  have h : size1 * ((n / size1) % size2) + n % size1 = n % (size2 * size1) := by
+    calc
+          size1 * ((n / size1) % size2) + n % size1
+        = size1 * ((n % (size1 * size2)) / size1) + n % size1 := ?_
+      _ = size1 * ((n % (size2 * size1)) / size1) + n % size1 := ?_
+      _ = size1 * ((n % (size2 * size1)) / size1) + (n % (size2 * size1)) % size1 := ?_
+      _ = n % (size2 * size1) := Nat.div_add_mod (n % (size2 * size1)) size1
+
+    . suffices hsuf : ((n / size1) % size2) = (n % (size1 * size2)) / size1 by
+        simp
+        rw [hsuf]
+      rw [Nat.mod_mul_right_div_self]
+    . conv =>
+        pattern n % (↑size1 * ↑size2)
+        rw [Nat.mul_comm]
+    . suffices hsuf : (n % (size2 * size1)) % size1 = n % size1 by
+        omega
+      exact Nat.mod_mul_left_mod n ↑size2 ↑size1
+
+  rw [<- h]
+  rw [Nat.add_assoc]
+  rw [Nat.sub_add_cancel]
+
+
+  calc
+         (↑size1 * ((n / ↑size1) % ↑size2)) + (n % ↑size1)
+       ≤ (↑size1 * ((n / ↑size1)))          + (n % ↑size1) := ?_
+    _  ≤ n := ?_
+  . have htrivial_ineq: ((n / ↑size1) % ↑size2) ≤ (n / ↑size1) := by apply Nat.mod_le
+    simp
+    apply Nat.mul_le_mul_left
+    assumption
+  . rw [Nat.div_add_mod]
+
+
 
 theorem heterogenous_base : ∀ (s : Shape) (x : Nat),
    heterogenous_base_bnf s x = x % s.max_index := by
@@ -284,7 +378,7 @@ theorem heterogenous_base : ∀ (s : Shape) (x : Nat),
 
     sorry
 
-
+end HeterogenousBase
 
 /-- ## View -/
 
