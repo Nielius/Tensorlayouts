@@ -303,28 +303,21 @@ theorem heterogenous_base : ∀ (s : Shape) (x : Nat),
     rw [heterogenous_base_bnf_cons]
     rw [tail_ih]
 
-    have hdigit2 : p.digit2 = x / Shape.max_index_posint shape_tail % shape_head := by
-      sorry
-    rw [← hdigit2]
+    have hsize2: p.size2 = shape_head := by rfl
+    rw [← hsize2]
 
-    have hdigit1 : p.digit1 = x % Shape.max_index shape_tail := by
-      sorry
-    rw [← hdigit1]
-
-    have hsize1 : p.size1 = Shape.max_index_posint shape_tail := by
-      sorry
+    have hsize1: p.size1 = Shape.max_index_posint shape_tail := by rfl
     rw [← hsize1]
 
-    have hmaxsize : p.size2 * p.size1 =  Shape.max_index (shape_head :: shape_tail) := by
-      rw [Shape.max_index_cons]
-      simp [Shape.max_index_posint]
+    have hsize1': p.size1 = Shape.max_index shape_tail := by rfl
+    rw [← hsize1']
+
+    have hmaxsize : p.size2 * p.size1 =  Shape.max_index (shape_head :: shape_tail) := by rfl
     rw [← hmaxsize]
 
     have hx : p.n = x := by rfl
     rw [← hx]
-
     apply (PairBaseRepresentation.first_digits_size p)
-
 
 end HeterogenousBase
 
