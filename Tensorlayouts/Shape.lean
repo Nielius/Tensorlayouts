@@ -424,7 +424,6 @@ def unravel_unsafe (s : Shape) : Nat -> List Nat :=
 #eval unravel_unsafe [⟨3, by simp⟩, ⟨7, by simp⟩, ⟨5, by simp⟩] 43
 
 
--- TODO: this is not quite correct, because we are taking a modulo at the very last component as well, whereas we shouldn't
 def unravel (s : Shape) : Nat -> IndexSet s :=
   fun idx =>
     ⟨ unravel_unsafe s idx, by
@@ -458,72 +457,20 @@ def View.to_unraveled_index_fn (v : View) : Nat -> Nat :=
 unravel is the inverse of the index function for the default view for a shape
 -/
 theorem unravel_correct_other : ∀ (s : Shape) (n : Nat),
-  n < s.max_index -> (View.from_shape s).to_unraveled_index_fn n = n := by
-  intro s n hbound
-  unfold View.to_unraveled_index_fn
-  unfold unravel
-  unfold unravel_unsafe
-  have shape_eq : (View.from_shape s).shape = s := by
-    rw [View.from_shape_shape_eq]
-  simp [shape_eq]
-  -- now we've nicely unfolded the unravelling function
+  (View.from_shape s).to_unraveled_index_fn n = n % s.max_index := by
+  intro s n
 
-  unfold View.from_shape
-  unfold View.to_index_fn_safe
-
-  have stride_eq : (View.from_shape s).stride = Stride.from_shape s := by
-    rw [View.from_shape_stride_eq]
-  simp [stride_eq]
-
-  -- introduce variable for strides
-  let strides := Stride.from_shape s
-  replace strides_eq : strides = Stride.from_shape s := by rfl
-
-  conv in (occs := 1 2) (Stride.from_shape s) =>
-     all_goals rw [← strides_eq]
-
-  -- now do the inner product
-  unfold List.inner_prod
-  rw [List.zipWith_zipWith_right]
-  rw [List.zipWith3_same_mid]
-
-  sorry -- we have now reduced the problem to simple arithmetic
-
-
-theorem unravel_correct_better : ∀ (s : Shape),
-  (View.to_index_fn_safe (View.from_shape s)) ∘ unravel s = id := by
-  intro s
-  funext n
-  unfold View.to_index_fn_safe
-  unfold View.from_shape
-  unfold unravel
-  unfold unravel_unsafe
-  simp
-  sorry -- this might not be correct, because we are taking a modulo at the very last component as well, whereas we shouldn't
-
-
-
-
-theorem unravel_correct : ∀ (s : Shape) (idx : IndexSet s),
-  unravel s (View.to_index_fn_safe (View.from_shape s) idx) = idx := by
-  intro s idx
-  unfold unravel
-  unfold unravel_unsafe
-  unfold View.to_index_fn_safe
-  unfold View.from_shape
-  simp
-  induction s
-  case nil =>
+  have hbnf : (View.from_shape s).to_unraveled_index_fn n = HeterogenousBase.heterogenous_base_bnf s n := by
+    unfold View.to_unraveled_index_fn
+    unfold unravel
+    unfold unravel_unsafe
+    unfold View.to_index_fn_safe
+    unfold View.from_shape
+    unfold HeterogenousBase.heterogenous_base_bnf
     simp
-    sorry -- this is easy
-  case cons hd tl ih =>
-    simp [ih]
-    sorry -- this is going to be annoying
+  rw [hbnf]
 
-#eval some_example
-
-#check View.to_index_fn_safe some_example
-
+  exact HeterogenousBase.heterogenous_base s n
 
 def View.example : View := {
   shape := [⟨2, by simp⟩, ⟨3, by simp⟩, ⟨4, by simp⟩],
