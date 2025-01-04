@@ -196,18 +196,26 @@ theorem heterogenous_base_bnf_cons : ∀ (shead : PosInt) (stail : Shape) (x : N
   rw [List.inner_prod_cons]
 
 
-
 /--
 A representation of a number in a heterogeneous base consisting of two digits,
 including the overflow to what would be the next digit.
 
 This structure is convenient for the proof of the correctness of the heterogenous base,
 because it has just enough information to do the induction step.
--/
 
+The idea is: p: PairBaseRepresentation = {size2, size1, n}
+represents the number n written in a base (size2, size1), with
+any overflow going to p.overflow.
+
+See also https://en.wikipedia.org/wiki/Mixed_radix
+
+The relevance to tensor layouts is that the unravel function for
+a shape s is equal to the function that sends a number to
+its representation in the mixed radix base given by the shape s.
+-/
 structure PairBaseRepresentation where
-  size2: PosInt
-  size1: PosInt
+  size2: PosInt -- radix 2
+  size1: PosInt -- radix 1
   n: Nat
   deriving Repr, DecidableEq
 
@@ -239,69 +247,33 @@ section PairBaseRepresentationTheorems
 variable (p : PairBaseRepresentation)
 theorem PairBaseRepresentation.first_digits_size : p.size1 * p.digit2 + p.digit1 = p.n % (p.size2 * p.size1) := by
   unfold PairBaseRepresentation.digit2 PairBaseRepresentation.digit1
-  sorry
 
-  /- Inspiration (old proof, pre-refactor):
+  have hdigit2 : (p.n / ↑p.size1 % ↑p.size2) = (p.n % (↑p.size2 * ↑p.size1)) / ↑p.size1 := by
     calc
-         (↑size1 * ((n / ↑size1) % ↑size2)) + (n % ↑size1)
-       ≤ (↑size1 * ((n / ↑size1)))          + (n % ↑size1) := ?_
-    _  ≤ n := ?_
-  . have htrivial_ineq: ((n / ↑size1) % ↑size2) ≤ (n / ↑size1) := by apply Nat.mod_le
-    simp
-    apply Nat.mul_le_mul_left
-    assumption
-  . rw [Nat.div_add_mod]
+      (p.n / ↑p.size1 % ↑p.size2)
+        = (p.n % (↑p.size1 * ↑p.size2) / ↑p.size1) := ?_
+      _ = (p.n % (↑p.size2 * ↑p.size1) / ↑p.size1) := ?_
+    . rw [Nat.mod_mul_right_div_self]
+    . rw [Nat.mul_comm]
 
-  -/
+  have hdigit1 : (p.n % ↑p.size1) = (p.n % (↑p.size2 * ↑p.size1)) % ↑p.size1 := by
+    calc
+      (p.n % ↑p.size1)
+        = (p.n % (↑p.size2 * ↑p.size1)) % ↑p.size1 := ?_
+      _ = (p.n % (↑p.size2 * ↑p.size1)) % ↑p.size1 := ?_
+    . rw [Nat.mod_mul_left_mod]
+    . rw [Nat.mul_comm]
+
+  rw [hdigit2, hdigit1]
+  exact Nat.div_add_mod (p.n % (↑p.size2 * ↑p.size1)) ↑p.size1
 
 -- set_option pp.parens true
 
-theorem PairBaseRepresentation.from_nat_to_nat :
-  p.overflow + p.size1 * p.digit2 + p.digit1 = p.n := by
-  unfold PairBaseRepresentation.overflow PairBaseRepresentation.digit2 PairBaseRepresentation.digit1
+-- theorem PairBaseRepresentation.from_nat_to_nat :
+--   p.overflow + p.size1 * p.digit2 + p.digit1 = p.n := by
+--   unfold PairBaseRepresentation.overflow PairBaseRepresentation.digit2 PairBaseRepresentation.digit1
 
-  sorry
-
-  /-
-  This is the previous proof; needs to be rewritten after refactor
-
-  have h : size1 * ((n / size1) % size2) + n % size1 = n % (size2 * size1) := by
-    calc
-          size1 * ((n / size1) % size2) + n % size1
-        = size1 * ((n % (size1 * size2)) / size1) + n % size1 := ?_
-      _ = size1 * ((n % (size2 * size1)) / size1) + n % size1 := ?_
-      _ = size1 * ((n % (size2 * size1)) / size1) + (n % (size2 * size1)) % size1 := ?_
-      _ = n % (size2 * size1) := Nat.div_add_mod (n % (size2 * size1)) size1
-
-    . suffices hsuf : ((n / size1) % size2) = (n % (size1 * size2)) / size1 by
-        simp
-        rw [hsuf]
-      rw [Nat.mod_mul_right_div_self]
-    . conv =>
-        pattern n % (↑size1 * ↑size2)
-        rw [Nat.mul_comm]
-    . suffices hsuf : (n % (size2 * size1)) % size1 = n % size1 by
-        omega
-      exact Nat.mod_mul_left_mod n ↑size2 ↑size1
-
-  rw [<- h]
-  rw [Nat.add_assoc]
-  rw [Nat.sub_add_cancel]
-
-
-  -- can now use previous theorem instead of this
-  calc
-         (↑size1 * ((n / ↑size1) % ↑size2)) + (n % ↑size1)
-       ≤ (↑size1 * ((n / ↑size1)))          + (n % ↑size1) := ?_
-    _  ≤ n := ?_
-  . have htrivial_ineq: ((n / ↑size1) % ↑size2) ≤ (n / ↑size1) := by apply Nat.mod_le
-    simp
-    apply Nat.mul_le_mul_left
-    assumption
-  . rw [Nat.div_add_mod]
-
-  -/
-
+--   sorry -- we don't really need this; but should not be so difficult to prove with the above proof
 
 end PairBaseRepresentationTheorems
 
