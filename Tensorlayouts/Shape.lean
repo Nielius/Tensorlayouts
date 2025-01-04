@@ -179,22 +179,21 @@ namespace HeterogenousBase
 /-- back-and-forth in the heterogeneous base; mostly a helper function -/
 def heterogenous_base_bnf (s : Shape) : Nat -> Nat :=
   fun x =>
-    (List.zipWith (fun shape stride => (x / stride % shape)) s.toNats (Stride.from_shape s).toNats).sum
+    (Stride.from_shape s).toNats.inner_prod
+    (List.zipWith (fun shape stride => (x / stride % shape)) s.toNats (Stride.from_shape s).toNats)
 
 
-example (a b c : ℕ) (H1 : a = b + 1) (H2 : b = c) : a = c + 1 :=
-calc a = b + 1 := H1
-     _ = c + 1 := by rw [H2]
-
--- calc is also available in tactic mode. You can leave ?_s to create a new goal:
-
-example (a b c : ℕ) (H1 : a = b + 1) (H2 : b = c) : a = c + 1 := by
-  calc
-    a = b + 1 := ?_
-    _ = c + 1 := ?_
-  · exact H1
-  · rw [H2]
-
+theorem heterogenous_base_bnf_cons : ∀ (shead : PosInt) (stail : Shape) (x : Nat),
+  heterogenous_base_bnf (shead :: stail) x =
+  (Shape.max_index_posint stail * (x / Shape.max_index_posint stail % shead)) +
+  heterogenous_base_bnf stail x := by
+  intro shead stail x
+  unfold heterogenous_base_bnf
+  rw [Stride.from_shape_cons_max_index]
+  rw [List.toNats_cons]
+  rw [List.toNats_cons]
+  rw [List.zipWith_cons_cons]
+  rw [List.inner_prod_cons]
 
 
 
@@ -205,32 +204,66 @@ including the overflow to what would be the next digit.
 This structure is convenient for the proof of the correctness of the heterogenous base,
 because it has just enough information to do the induction step.
 -/
+
 structure PairBaseRepresentation where
-  overflow: Nat
-  digit2: Nat
-  digit1: Nat
   size2: PosInt
   size1: PosInt
+  n: Nat
+  deriving Repr, DecidableEq
 
-def PairBaseRepresentation.to_nat : PairBaseRepresentation -> Nat :=
-  fun p =>
-    p.overflow + p.size1 * p.digit2 + p.digit1
+section PairBaseRepresentationProperties
+variable (p : PairBaseRepresentation)
 
-def PairBaseRepresentation.from_nat (size2 size1 : PosInt) : Nat -> PairBaseRepresentation :=
-  fun n =>
-    let digit2 := (n / size1) % size2
-    let digit1 := n % size1
-    let overflow := n - (n % (size2 * size1))
-    {overflow := overflow, digit2 := digit2, digit1 := digit1, size2 := size2, size1 := size1}
+def PairBaseRepresentation.overflow : Nat :=
+  p.n % (p.size2 * p.size1)
 
-set_option pp.parens true
+def PairBaseRepresentation.digit2 : Nat :=
+  (p.n / p.size1) % p.size2
 
-theorem PairBaseRepresentation.from_nat_to_nat : ∀ (size2 size1 : PosInt) (n : Nat),
-  PairBaseRepresentation.to_nat (PairBaseRepresentation.from_nat size2 size1 n) = n := by
-  intro size2 size1 n
-  unfold PairBaseRepresentation.from_nat
-  unfold PairBaseRepresentation.to_nat
-  simp
+def PairBaseRepresentation.digit1 : Nat :=
+  p.n % p.size1
+
+theorem PairBaseRepresentation.digit2_lt_size : p.digit2 < p.size2 := by
+  unfold PairBaseRepresentation.digit2
+  apply Nat.mod_lt
+  exact p.size2.property
+
+theorem PairBaseRepresentation.digit1_lt_size : p.digit1 < p.size1 := by
+  unfold PairBaseRepresentation.digit1
+  apply Nat.mod_lt
+  exact p.size1.property
+end PairBaseRepresentationProperties
+
+section PairBaseRepresentationTheorems
+
+variable (p : PairBaseRepresentation)
+theorem PairBaseRepresentation.first_digits_size : p.size1 * p.digit2 + p.digit1 = p.n % (p.size2 * p.size1) := by
+  unfold PairBaseRepresentation.digit2 PairBaseRepresentation.digit1
+  sorry
+
+  /- Inspiration (old proof, pre-refactor):
+    calc
+         (↑size1 * ((n / ↑size1) % ↑size2)) + (n % ↑size1)
+       ≤ (↑size1 * ((n / ↑size1)))          + (n % ↑size1) := ?_
+    _  ≤ n := ?_
+  . have htrivial_ineq: ((n / ↑size1) % ↑size2) ≤ (n / ↑size1) := by apply Nat.mod_le
+    simp
+    apply Nat.mul_le_mul_left
+    assumption
+  . rw [Nat.div_add_mod]
+
+  -/
+
+-- set_option pp.parens true
+
+theorem PairBaseRepresentation.from_nat_to_nat :
+  p.overflow + p.size1 * p.digit2 + p.digit1 = p.n := by
+  unfold PairBaseRepresentation.overflow PairBaseRepresentation.digit2 PairBaseRepresentation.digit1
+
+  sorry
+
+  /-
+  This is the previous proof; needs to be rewritten after refactor
 
   have h : size1 * ((n / size1) % size2) + n % size1 = n % (size2 * size1) := by
     calc
@@ -256,6 +289,7 @@ theorem PairBaseRepresentation.from_nat_to_nat : ∀ (size2 size1 : PosInt) (n :
   rw [Nat.sub_add_cancel]
 
 
+  -- can now use previous theorem instead of this
   calc
          (↑size1 * ((n / ↑size1) % ↑size2)) + (n % ↑size1)
        ≤ (↑size1 * ((n / ↑size1)))          + (n % ↑size1) := ?_
@@ -266,7 +300,10 @@ theorem PairBaseRepresentation.from_nat_to_nat : ∀ (size2 size1 : PosInt) (n :
     assumption
   . rw [Nat.div_add_mod]
 
+  -/
 
+
+end PairBaseRepresentationTheorems
 
 theorem heterogenous_base : ∀ (s : Shape) (x : Nat),
    heterogenous_base_bnf s x = x % s.max_index := by
@@ -278,105 +315,44 @@ theorem heterogenous_base : ∀ (s : Shape) (x : Nat),
     unfold Shape.max_index
     unfold Nat.prod
     unfold List.toNats
+    unfold List.inner_prod
     simp
     omega
 
   case cons shape_head shape_tail tail_ih =>
     intro x
-    let xrem := x % Shape.max_index shape_tail
-    let xdiv := x / Shape.max_index shape_tail
 
-    have hxdiv_eq : Shape.max_index shape_tail * xdiv + xrem = x := by
-      unfold xrem xdiv
-      exact Nat.div_add_mod x (Shape.max_index shape_tail)
+    let p : PairBaseRepresentation := {
+      size2 := shape_head,
+      size1 := Shape.max_index_posint shape_tail,
+      n := x
+    }
 
-    have hxrem_lt : xrem < Shape.max_index shape_tail := by
-      apply Nat.mod_lt
-      exact (Shape.max_index_posint shape_tail).property
+    rw [heterogenous_base_bnf_cons]
+    rw [tail_ih]
 
-    have hxrem_ih : heterogenous_base_bnf shape_tail xrem = xrem % Shape.max_index shape_tail := by
-      apply tail_ih
+    have hdigit2 : p.digit2 = x / Shape.max_index_posint shape_tail % shape_head := by
+      sorry
+    rw [← hdigit2]
 
-    rw [Nat.mod]
+    have hdigit1 : p.digit1 = x % Shape.max_index shape_tail := by
+      sorry
+    rw [← hdigit1]
 
-    have hasdf : (Shape.max_index shape_tail * xdiv + xrem) % Shape.max_index (shape_head :: shape_tail)
-    = Shape.max_index shape_tail * (xdiv / shape_head) % Shape.max_index (shape_head :: shape_tail) + xrem % Shape.max_index shape_tail := by
+    have hsize1 : p.size1 = Shape.max_index_posint shape_tail := by
+      sorry
+    rw [← hsize1]
 
-
-
-
-    conv =>
-      rhs
-      rw [<- hxdiv_eq]
-
-
-
-    have Shape.max_index (shape_head :: shape_tail)
-
-
-
-
-
-    rw [List.toNats_cons]
-    rw [Stride.from_shape_cons_max_index]
-    simp
-    rw [List.toNats_cons]
-    rw [List.zipWith_cons_cons]
-
-    rw [List.sum_cons]
-
-    rw [← hxdiv_eq]
-
-    rw [tail_ih xrem]
-    simp [Shape.max_index_posint]
-    swap
-
-
-
-
-    rw [← hxdiv_eq]
-
-
-
-
-
-
-    /- Maybe this case distinction is not necessary? -/
-    by_cases x < Shape.max_index shape_tail
-
-    case pos hnewbound =>
-      rw [List.toNats_cons]
-      rw [Stride.from_shape_cons_max_index]
-      simp
-      rw [List.toNats_cons]
-      rw [List.zipWith_cons_cons]
-
-      rw [List.sum_cons]
-      rw [tail_ih]
+    have hmaxsize : p.size2 * p.size1 =  Shape.max_index (shape_head :: shape_tail) := by
+      rw [Shape.max_index_cons]
       simp [Shape.max_index_posint]
+    rw [← hmaxsize]
 
-      rw [Shape.max_index_cons] at hbound
-      conv =>
-        pattern (x / _ % _)
-        rw [← Nat.mod_mul_right_div_self]
-      rw [Nat.mod_eq_of_lt]
-      swap
-      rw [Nat.mul_comm]
-      assumption
-      apply Nat.div_eq_of_lt; all_goals assumption
+    have hx : p.n = x := by rfl
+    rw [← hx]
 
-    case neg hnewbound =>
-      rw [List.toNats_cons]
-      rw [Stride.from_shape_cons_max_index]
-      simp
-      rw [List.toNats_cons]
-      rw [List.zipWith_cons_cons]
+    apply (PairBaseRepresentation.first_digits_size p)
 
-
-
-
-
-    sorry
 
 end HeterogenousBase
 

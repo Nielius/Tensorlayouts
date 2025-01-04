@@ -15,6 +15,13 @@ theorem Nat.prod_cons : Nat.prod (a :: l) = a * Nat.prod l := by
 def List.inner_prod {α: Type} [Mul α] [Add α] [Zero α] (l : List α) (r : List α) : α :=
    List.sum (List.zipWith (fun x y => x * y) l r)
 
+theorem List.inner_prod_cons {α: Type} [Mul α] [Add α] [Zero α] (a : α) (l : List α) (b : α) (r : List α) :
+   List.inner_prod (a :: l) (b :: r) = a * b + List.inner_prod l r := by
+  unfold List.inner_prod
+  rw [List.zipWith_cons_cons]
+  rw [List.sum_cons]
+
+
 /-- ## PosInt -/
 
 def PosInt := { n : Nat // n > 0 }
