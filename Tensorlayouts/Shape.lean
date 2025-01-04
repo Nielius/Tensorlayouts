@@ -3,9 +3,6 @@ import Tensorlayouts.ArithHelpers
 import Mathlib.Data.List.Basic -- needed for e.g. List.scanr_nil; this is part of simp
 import Mathlib.Data.List.Zip -- needed for List.zipWith_map_right
 
-import Mathlib.Tactic.Zify
-open Mathlib.Tactic.Zify (zify)
-
 /- ## Shape and Stride -/
 
 def Shape :=  List PosInt
@@ -72,10 +69,6 @@ def Stride.from_shape_cons (hd : PosInt) (tl : List PosInt) :
     simp
     congr
     apply List.head?_eq_getElem?
-
-
-
-#eval Stride.from_shape [⟨2, by simp⟩, ⟨3, by simp⟩, ⟨54, by simp⟩]
 
 
 /- ## Indexing for shapes -/
