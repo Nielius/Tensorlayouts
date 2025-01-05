@@ -15,6 +15,11 @@ theorem Nat.prod_cons : Nat.prod (a :: l) = a * Nat.prod l := by
 def List.inner_prod {α: Type} [Mul α] [Add α] [Zero α] (l : List α) (r : List α) : α :=
    List.sum (List.zipWith (fun x y => x * y) l r)
 
+theorem List.inner_prod_nil_nil {α: Type} [Mul α] [Add α] [Zero α] :
+   List.inner_prod [] [] = 0 := by
+  simp [List.inner_prod, List.sum_nil, List.zipWith_nil]
+
+
 theorem List.inner_prod_cons {α: Type} [Mul α] [Add α] [Zero α] (a : α) (l : List α) (b : α) (r : List α) :
    List.inner_prod (a :: l) (b :: r) = a * b + List.inner_prod l r := by
   unfold List.inner_prod

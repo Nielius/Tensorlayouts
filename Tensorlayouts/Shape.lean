@@ -73,8 +73,22 @@ def Stride.from_shape_cons (hd : PosInt) (tl : List PosInt) :
 
 /- ## Indexing for shapes -/
 
+/--
+ Upper bound for the index that the shape can represent
+ in the shape's canonical view.
+-/
 def Shape.max_index (shape : Shape) : Nat :=
   Nat.prod shape.toNats
+
+abbrev NatLt (n : Nat) : Type := { idx : Nat // idx < n }
+
+abbrev Shape.max_index_subtype (shape : Shape) : Type := NatLt (Shape.max_index shape)
+
+def NatLt.embedding {n m : Nat} (h : n ≤ m) : NatLt n -> NatLt m :=
+  fun x => ⟨x.val, Nat.lt_of_lt_of_le x.property h⟩
+
+def NatLt.embed_nat {n : Nat} : NatLt n -> Nat :=
+  fun x => x.val
 
 theorem Shape.max_index_cons (a : PosInt) (shape : Shape) :
   Shape.max_index (a :: shape) = a * Shape.max_index shape := by
@@ -94,6 +108,11 @@ def Shape.max_index_posint (shape : Shape) : PosInt :=
       simp_all only [Nat.mul_pos_iff_of_pos_right]
       exact hd.property
   ⟩
+
+theorem Shape.max_index_posint_coe (shape : Shape) :
+  (Shape.max_index_posint shape : Nat) = Shape.max_index shape := by
+  unfold Shape.max_index_posint Shape.max_index
+  simp
 
 def Stride.from_shape_cons_max_index (hd : PosInt) (tl : List PosInt) :
   Stride.from_shape (hd :: tl) =
@@ -341,6 +360,9 @@ def View.from_shape (shape : Shape) : View := {
     rw [List.scanr_length_tail]
 }
 
+theorem View.from_shape_nil : View.from_shape [] = {shape := [], stride := [], lengthEq := by simp} := by
+  simp [View.from_shape, Stride.from_shape]
+
 theorem View.from_shape_shape_eq (s: Shape) : (View.from_shape s).shape = s := by
   unfold View.from_shape
   simp
@@ -362,11 +384,73 @@ def View.to_index_fn_unsafe (v : View) : List Nat → Option Nat
           else
             none
 
-def View.max_index (v : View) : Nat :=
-  v.shape.max_index
+/--
+  The smallest upper bound for the index that the view can represent.
 
-def View.to_index_fn_safe (v : View) : (IndexSet v.shape) -> Nat :=
-  fun ⟨idx, _⟩ => v.stride.toNats.inner_prod idx
+  This is equal to ∑_i (s_i - 1) σ_i + 1, where σ_i is the ith stride, and s_i is the ith size.
+  This assumes all strides are positive! In theory you could have negative strides...
+-/
+def View.max_index (v : View) : Nat :=
+  v.stride.toNats.inner_prod (v.shape.toNats.map (fun x => x - 1)) + 1
+
+theorem View.max_index_cons :
+  ({ shape := shape_head :: shape_tail, stride := stride_head :: stride_tail, lengthEq := by sorry } : View).max_index
+  = (shape_head - 1) * stride_head + ({ shape := shape_tail, stride := stride_tail, lengthEq := by sorry } : View).max_index := by
+  unfold View.max_index
+  simp [List.toNats_cons, List.inner_prod_cons, List.map_cons, List.foldr_cons]
+  simp_arith
+  apply Nat.mul_comm
+
+
+theorem View.max_index_from_shape (s : Shape) : (View.from_shape s).max_index = s.max_index := by
+  induction s
+  case nil =>
+    simp [View.max_index, Shape.max_index, List.toNats, Nat.prod, View.from_shape_nil]
+    apply (@List.inner_prod_nil_nil Nat)
+
+  case cons hd tl ih =>
+    conv =>
+      rhs
+      rw [Shape.max_index_cons]
+
+    conv =>
+      lhs
+      unfold View.from_shape
+      pattern (Stride.from_shape (hd :: tl))
+      rw [Stride.from_shape_cons_max_index]
+
+    unfold View.max_index
+    simp
+    simp [List.toNats_cons, List.map_cons, List.inner_prod_cons]
+    rw [← ih]
+
+    have heq:  (List.toNats (Stride.from_shape tl)).inner_prod (List.map (fun x ↦ x - 1) tl.toNats) + 1 = (from_shape tl).max_index := by
+      unfold View.max_index
+      rw [View.from_shape_shape_eq, View.from_shape_stride_eq]
+
+    conv =>
+      lhs
+      rw [Nat.add_assoc]
+      rw [heq]
+
+    have hsuf :  ↑(Shape.max_index_posint tl) = (from_shape tl).max_index := by
+      rw [Shape.max_index_posint_coe]
+      rw [ih]
+
+    rw [hsuf]
+    rw [Nat.mul_comm]
+    rw [← Nat.succ_mul]
+    simp_arith
+
+    rw [Nat.sub_add_cancel]
+    apply hd.property
+
+
+
+def View.to_index_fn_safe (v : View) : (IndexSet v.shape) -> NatLt v.max_index :=
+  fun ⟨idx, idx_bds⟩ => ⟨v.stride.toNats.inner_prod idx, by
+    sorry
+ ⟩
   -- we could add here that the result is always less than the max index
 
 example : View :=
@@ -382,7 +466,7 @@ def unravel_unsafe (s : Shape) : Nat -> List Nat :=
 #eval unravel_unsafe [⟨3, by simp⟩, ⟨7, by simp⟩, ⟨5, by simp⟩] 43
 
 
-def unravel (s : Shape) : Nat -> IndexSet s :=
+def unravel (s : Shape) : s.max_index_subtype -> IndexSet s :=
   fun idx =>
     ⟨ unravel_unsafe s idx, by
       unfold unravel_unsafe
@@ -408,14 +492,20 @@ def unravel (s : Shape) : Nat -> IndexSet s :=
       exact s[i].property
     ⟩
 
-def View.to_unraveled_index_fn (v : View) : Nat -> Nat :=
+/--
+Interpretation: the input is a Nat representing an entry in the tensor; the output is the memory index
+-/
+def View.to_unraveled_index_fn (v : View) : v.shape.max_index_subtype -> NatLt v.max_index :=
   v.to_index_fn_safe ∘ unravel v.shape
 
 /--
 unravel is the inverse of the index function for the default view for a shape
+
+We could make this a bit more general: if we extend unravel to all of Nat,
+then this is also true for any n : Nat.
 -/
-theorem unravel_correct_other : ∀ (s : Shape) (n : Nat),
-  (View.from_shape s).to_unraveled_index_fn n = n % s.max_index := by
+theorem unravel_correct : ∀ (s : Shape) (n : s.max_index_subtype),
+  (View.from_shape s).to_unraveled_index_fn n = (n : Nat) % s.max_index := by
   intro s n
 
   have hbnf : (View.from_shape s).to_unraveled_index_fn n = HeterogenousBase.heterogenous_base_bnf s n := by
@@ -429,6 +519,17 @@ theorem unravel_correct_other : ∀ (s : Shape) (n : Nat),
   rw [hbnf]
 
   exact HeterogenousBase.heterogenous_base s n
+
+theorem unravel_correct' (s : Shape) :
+  (View.from_shape s).to_unraveled_index_fn = (fun x => ⟨ x % s.max_index, by
+    rw [View.max_index_from_shape]
+    apply Nat.mod_lt
+    exact s.max_index_posint.property
+   ⟩ ) := by
+  funext n
+  apply Subtype.ext
+  apply unravel_correct
+
 
 def View.example : View := {
   shape := [⟨2, by simp⟩, ⟨3, by simp⟩, ⟨4, by simp⟩],
