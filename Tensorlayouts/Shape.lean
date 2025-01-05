@@ -88,6 +88,11 @@ def NatLt.embedding {n m : Nat} (h : n ≤ m) : NatLt n -> NatLt m :=
 def NatLt.embed_nat {n : Nat} : NatLt n -> Nat :=
   fun x => x.val
 
+theorem NatLt.embedding_comp {n m k : Nat} (h1 : k ≤ n) (h2 : m ≤ k) : NatLt.embedding h1 ∘ NatLt.embedding h2 = NatLt.embedding (Nat.le_trans h2 h1) := by
+  funext n
+  simp [NatLt.embedding]
+
+
 theorem Shape.max_index_cons (a : PosInt) (shape : Shape) :
   Shape.max_index (a :: shape) = a * Shape.max_index shape := by
   unfold Shape.max_index
@@ -553,7 +558,7 @@ theorem unravel_correct_fn (s: Shape):
     rw [<- View.from_shape_shape_eq s]
   exact n.property
 
-theorem unravel_correct_fn':
+theorem unravel_correct_fn' (s: Shape):
   exists hsametype: NatLt (View.from_shape s).shape.max_index = NatLt (View.from_shape s).max_index,
      (View.from_shape s).to_unraveled_index_fn = (cast hsametype) := by
 
