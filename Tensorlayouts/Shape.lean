@@ -82,8 +82,6 @@ def Shape.max_index (shape : Shape) : Nat :=
 
 abbrev NatLt (n : Nat) : Type := { idx : Nat // idx < n }
 
-abbrev Shape.max_index_subtype (shape : Shape) : Type := NatLt (Shape.max_index shape)
-
 def NatLt.embedding {n m : Nat} (h : n ≤ m) : NatLt n -> NatLt m :=
   fun x => ⟨x.val, Nat.lt_of_lt_of_le x.property h⟩
 
@@ -466,7 +464,7 @@ def unravel_unsafe (s : Shape) : Nat -> List Nat :=
 #eval unravel_unsafe [⟨3, by simp⟩, ⟨7, by simp⟩, ⟨5, by simp⟩] 43
 
 
-def unravel (s : Shape) : s.max_index_subtype -> IndexSet s :=
+def unravel (s : Shape) : NatLt s.max_index -> IndexSet s :=
   fun idx =>
     ⟨ unravel_unsafe s idx, by
       unfold unravel_unsafe
@@ -495,7 +493,7 @@ def unravel (s : Shape) : s.max_index_subtype -> IndexSet s :=
 /--
 Interpretation: the input is a Nat representing an entry in the tensor; the output is the memory index
 -/
-def View.to_unraveled_index_fn (v : View) : v.shape.max_index_subtype -> NatLt v.max_index :=
+def View.to_unraveled_index_fn (v : View) : NatLt v.shape.max_index -> NatLt v.max_index :=
   v.to_index_fn_safe ∘ unravel v.shape
 
 /--
@@ -504,7 +502,7 @@ unravel is the inverse of the index function for the default view for a shape
 We could make this a bit more general: if we extend unravel to all of Nat,
 then this is also true for any n : Nat.
 -/
-theorem unravel_correct : ∀ (s : Shape) (n : s.max_index_subtype),
+theorem unravel_correct : ∀ (s : Shape) (n : NatLt s.max_index),
   (View.from_shape s).to_unraveled_index_fn n = (n : Nat) % s.max_index := by
   intro s n
 
@@ -519,6 +517,65 @@ theorem unravel_correct : ∀ (s : Shape) (n : s.max_index_subtype),
   rw [hbnf]
 
   exact HeterogenousBase.heterogenous_base s n
+
+
+theorem unravel_correct_fn (s: Shape):
+  exists
+    (htype_input : NatLt (View.from_shape s).shape.max_index = NatLt s.max_index)
+    (htype_output : NatLt (View.from_shape s).max_index = NatLt s.max_index) ,
+     (cast htype_output) ∘ (View.from_shape s).to_unraveled_index_fn ∘ (cast htype_input) = id := by
+  have htype_input : NatLt (View.from_shape s).shape.max_index = NatLt s.max_index := by
+    rw [View.from_shape_shape_eq]
+  have htype_output : NatLt (View.from_shape s).max_index = NatLt s.max_index := by
+    rw [View.max_index_from_shape]
+
+  exists htype_input, htype_output
+
+  funext n
+  unfold id
+  unfold Function.comp
+  simp
+
+  apply Subtype.ext
+
+  have hcast (n : NatLt (View.from_shape s).max_index): ↑ (cast htype_output n) = (n : Nat) := by
+    congr
+    . rw [View.max_index_from_shape]
+    . simp
+
+  rw [hcast]
+  rw [unravel_correct]
+
+  apply Nat.mod_eq_of_lt
+
+  conv =>
+    rhs
+    rw [<- View.from_shape_shape_eq s]
+  exact n.property
+
+theorem unravel_correct_fn':
+  exists hsametype: NatLt (View.from_shape s).shape.max_index = NatLt (View.from_shape s).max_index,
+     (View.from_shape s).to_unraveled_index_fn = (cast hsametype) := by
+
+  have hsametype: NatLt (View.from_shape s).shape.max_index = NatLt (View.from_shape s).max_index := by
+    rw [View.max_index_from_shape]
+    rw [View.from_shape_shape_eq]
+  exists hsametype
+
+  funext n
+  have hcorrect : _ := unravel_correct_fn s
+
+  cases hcorrect with
+  | intro htype_input hrest =>
+    cases hrest with
+    | intro htype_output hcorrect_fn =>
+      have hcorrect_fn_n : _ := congrFun hcorrect_fn n
+      simp at hcorrect_fn_n
+      conv =>
+        rhs
+        rw [<- hcorrect_fn_n]
+
+      simp
 
 theorem unravel_correct' (s : Shape) :
   (View.from_shape s).to_unraveled_index_fn = (fun x => ⟨ x % s.max_index, by
