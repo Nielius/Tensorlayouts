@@ -73,6 +73,21 @@ theorem NatLt.embedding_comp {n m k : Nat} (h1 : k ≤ n) (h2 : m ≤ k) : NatLt
   funext n
   simp [NatLt.embedding]
 
+theorem NatLt.embed_nat_comp_embedding {n m : Nat} (h : m ≤ n) : NatLt.embed_nat ∘ NatLt.embedding h = NatLt.embed_nat := by
+  funext x
+  simp [NatLt.embedding]
+  unfold NatLt.embed_nat
+  rfl
+
+theorem NatLt.cast_comp_embedding {n m k : Nat} (hembed : n ≤ m) (heq : m = k) :
+     (heq ▸ id) ∘ NatLt.embedding hembed = NatLt.embedding (heq ▸ hembed) := by
+  funext x
+  subst heq
+  simp
+
+--   Eq.rec (motive := fun x h ↦ NatLt k → NatLt x) id hshape_fn
+
+
 
 /-- ## scanr lemmas -/
 
