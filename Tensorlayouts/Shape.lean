@@ -450,9 +450,41 @@ theorem View.max_index_from_shape (s : Shape) : (View.from_shape s).max_index = 
 
 
 
+
 def View.to_index_fn_safe (v : View) : (IndexSet v.shape) -> NatLt v.max_index :=
   fun ⟨idx, idx_bds⟩ => ⟨v.stride.toNats.inner_prod idx, by
-    sorry
+
+    have hasdf : forall (n : Nat), n = v.shape.length -> (v.stride.toNats.inner_prod idx < v.max_index) := by
+      -- introducing this is the only way I know of doing induction on n, while keeping the right hypotheses in the goal
+      intro n hn
+      induction n
+      . have hshape_empty: v.shape = [] := by
+          apply List.eq_nil_of_length_eq_zero
+          exact (Eq.symm hn)
+
+        have hstride_empty: v.stride = [] := by
+          apply List.eq_nil_of_length_eq_zero
+          have hlen : v.stride.length = 0 := by
+            rw [<- v.lengthEq]
+            exact (Eq.symm hn)
+          assumption
+
+        simp [hshape_empty, hstride_empty]
+        simp [View.max_index, List.toNats, List.inner_prod, List.map, List.foldr]
+
+      case succ n ih =>
+        -- I should have made sure the induction hypothesis holds for any view, not just this v
+
+        have hshape_cons : _ := List.exists_cons_of_length_eq_add_one (Eq.symm hn)
+        obtain ⟨shape_hd, shape_tl, hshape_cons'⟩ := hshape_cons
+
+        -- have hstride_len : _ := List.length_eq_add_one_of_cons hshape_cons'
+        have hstride_cons : _ := List.exists_cons_of_length_eq_add_one (Eq.symm hn)
+        obtain ⟨stride_hd, stride_tl, hstride_cons'⟩ := hstride_cons
+
+        sorry --- it is achievable from this point
+
+    apply (hasdf v.shape.length (Eq.refl v.shape.length))
  ⟩
   -- we could add here that the result is always less than the max index
 
