@@ -59,6 +59,21 @@ theorem PosInt.mul_comm (a b : PosInt) : a * b = b * a := by
 instance : Std.Commutative (α := PosInt) (· * ·) := ⟨PosInt.mul_comm⟩
 
 
+/-- ## NatLT -/
+
+abbrev NatLt (n : Nat) : Type := { idx : Nat // idx < n }
+
+def NatLt.embedding {n m : Nat} (h : n ≤ m) : NatLt n -> NatLt m :=
+  fun x => ⟨x.val, Nat.lt_of_lt_of_le x.property h⟩
+
+def NatLt.embed_nat {n : Nat} : NatLt n -> Nat :=
+  fun x => x.val
+
+theorem NatLt.embedding_comp {n m k : Nat} (h1 : k ≤ n) (h2 : m ≤ k) : NatLt.embedding h1 ∘ NatLt.embedding h2 = NatLt.embedding (Nat.le_trans h2 h1) := by
+  funext n
+  simp [NatLt.embedding]
+
+
 /-- ## scanr lemmas -/
 
 theorem List.scanr_length {α β : Type}  (f : α → β → β) (init : β) (l : List α) :

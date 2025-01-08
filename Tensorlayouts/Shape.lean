@@ -1,5 +1,6 @@
 import Aesop
 import Tensorlayouts.ArithHelpers
+import Tensorlayouts.CastingLemmas
 import Mathlib.Data.List.Basic -- needed for e.g. List.scanr_nil; this is part of simp
 import Mathlib.Data.List.Zip -- needed for List.zipWith_map_right
 
@@ -79,19 +80,6 @@ def Stride.from_shape_cons (hd : PosInt) (tl : List PosInt) :
 -/
 def Shape.max_index (shape : Shape) : Nat :=
   Nat.prod shape.toNats
-
-abbrev NatLt (n : Nat) : Type := { idx : Nat // idx < n }
-
-def NatLt.embedding {n m : Nat} (h : n ≤ m) : NatLt n -> NatLt m :=
-  fun x => ⟨x.val, Nat.lt_of_lt_of_le x.property h⟩
-
-def NatLt.embed_nat {n : Nat} : NatLt n -> Nat :=
-  fun x => x.val
-
-theorem NatLt.embedding_comp {n m k : Nat} (h1 : k ≤ n) (h2 : m ≤ k) : NatLt.embedding h1 ∘ NatLt.embedding h2 = NatLt.embedding (Nat.le_trans h2 h1) := by
-  funext n
-  simp [NatLt.embedding]
-
 
 theorem Shape.max_index_cons (a : PosInt) (shape : Shape) :
   Shape.max_index (a :: shape) = a * Shape.max_index shape := by
@@ -613,6 +601,27 @@ theorem unravel_correct_fn' (s: Shape):
         rw [<- hcorrect_fn_n]
 
       simp
+
+
+theorem unravel_correct_fn'' (s: Shape):
+  exists hsametype: (View.from_shape s).shape.max_index = (View.from_shape s).max_index,
+     (View.from_shape s).to_unraveled_index_fn = hsametype ▸ id := by
+  have hsametype: (View.from_shape s).shape.max_index = (View.from_shape s).max_index := by
+    rw [View.max_index_from_shape]
+    rw [View.from_shape_shape_eq]
+  exists hsametype
+
+  funext n
+  have hcorrect : _ := unravel_correct s n
+  have hshape: (View.from_shape s).shape = s := by
+    rw [View.from_shape_shape_eq]
+  have hn_modulo_bound : ↑n % s.max_index = ↑n := by
+    apply Nat.mod_eq_of_lt n.property
+  rw [hn_modulo_bound] at hcorrect
+
+  apply id_casting_lemma
+  assumption
+
 
 theorem unravel_correct' (s : Shape) :
   (View.from_shape s).to_unraveled_index_fn = (fun x => ⟨ x % s.max_index, by
