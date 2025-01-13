@@ -1,6 +1,12 @@
 import Tensorlayouts.Shape
+import Tensorlayouts.ExperimentFunCast
 
 import Mathlib.Data.Set.Basic
+
+
+def View.compose (v1: View) (v2: View) (h: v2.max_index ≤ v1.shape.max_index) : IndexSet v2.shape -> NatLt v1.max_index :=
+  v1.to_unraveled_index_fn ∘ NatLt.embedding h ∘ v2.to_index_fn_safe
+
 
 /--
   Expresses whether v is a merge of v1 and v2
@@ -9,8 +15,9 @@ def View.is_merge (v: View) (v1 : View) (v2 : View) : Prop :=
   exists (hshape: v2.shape = v.shape)
          (hmaxsize : v2.max_index ≤ v1.shape.max_index),
   let hshape_fn :  (IndexSet v2.shape → NatLt v2.max_index) = (IndexSet v.shape → NatLt v2.max_index) := by congr
-    NatLt.embed_nat ∘ v.to_index_fn_safe
-  = NatLt.embed_nat ∘ v1.to_unraveled_index_fn ∘ NatLt.embedding hmaxsize ∘ (cast hshape_fn v2.to_index_fn_safe)
+    NatLt.embed_nat ∘ (hshape ▸ v.to_index_fn_safe)
+  = NatLt.embed_nat ∘ (View.compose v1 v2 hmaxsize)
+  -- = NatLt.embed_nat ∘ v1.to_unraveled_index_fn ∘ NatLt.embedding hmaxsize ∘ (cast hshape_fn v2.to_index_fn_safe)
 
 
 def View.is_mergeable  (v1 : View) (v2 : View) : Prop :=
@@ -22,6 +29,7 @@ theorem View.is_mergeable_left_canonical (s : Shape) (v2 : View) (hmaxsize : v2.
   View.is_mergeable (View.from_shape s) v2 := by
   exists v2
   unfold View.is_merge
+  unfold View.compose
 
   have hshape : v2.shape = v2.shape := by rfl
   exists hshape
@@ -105,7 +113,77 @@ theorem lemma_index_in_shape'' (hidx_bound : shape * stride ≤ k) (hshape: shap
 
 end IndexLemmasForTheorem
 
--- def index_multiple (i : Nat) (stride : PosInt) : NatLt (shape * stride) :=
+
+theorem View.is_merge_implies_shape_eq (v v1 v2 : View) (h_merge : View.is_merge v v1 v2) : v.shape = v2.shape := by
+  obtain ⟨hshape, hmaxsize, h_merge_eq⟩ := h_merge
+  exact Eq.symm hshape
+
+
+theorem View.is_mergeable_single_dimension_right_implies_linear_function (v1: View) (shape : PosInt) (stride : PosInt) (hshape : shape.val > 1) (v: View) :
+  let v2 := View.from_single_dimension shape stride
+  let stride' := v1.to_unraveled_index_fn ⟨stride, by sorry ⟩
+  (View.is_merge v v1 v2) → v = ({ shape := [shape], stride := [⟨stride', by sorry ⟩], lengthEq := by simp } : View) := by
+
+  intro v2
+  intro stride'
+  intro h_merge
+
+  unfold View.is_merge at h_merge
+
+  have hshape_eq : v.shape = v2.shape := by
+    apply View.is_merge_implies_shape_eq
+    exact h_merge
+
+  /- Useful to do early on: establish v = from_single_dimension vshape vstride, and use that everywhere -/
+  have h_v_len_1 : v.shape.length = 1 := by rw [hshape_eq] ; rw [View.from_single_dimension_shape_eq] ; simp
+  obtain ⟨ vshape, vstride, hv_eq ⟩ := View.len_1_from_single_dimension v h_v_len_1
+  subst hv_eq
+
+  obtain ⟨hshape, hmaxsize, h_merge_eq⟩ := h_merge
+
+  have hvshape : vshape = shape := by
+    repeat rw [View.from_single_dimension_shape_eq] at hshape
+    rw [<- List.singleton_inj]
+    assumption
+
+  subst hvshape
+
+  /- It remains to do the stride. For that, we need to do a calculation, based on h_merge_eq 1-/
+  have h_merge_eq_1 : _ := congrFun h_merge_eq ⟨ [1], by sorry ⟩
+  simp at h_merge_eq_1
+
+  /- Left hand side is equal to vstride -/
+  rw [View.from_single_dimension_index_fn_safe_eq] at h_merge_eq_1
+  simp at h_merge_eq_1
+
+  /- Right hand side is the calculation you get -/
+  unfold View.compose at h_merge_eq_1
+  simp at h_merge_eq_1
+  unfold v2 at h_merge_eq_1
+  rw [View.from_single_dimension_index_fn_safe_eq] at h_merge_eq_1
+  simp at h_merge_eq_1
+  unfold NatLt.embed_nat at h_merge_eq_1
+  simp at h_merge_eq_1
+  have hvstride : vstride = ⟨stride', by sorry ⟩ := by
+    apply Subtype.ext
+    assumption
+
+  subst hvstride
+  simp [View.from_single_dimension]
+
+
+theorem View.is_mergeable_single_dimension_right_exists_linear_function (v1: View) (shape : PosInt) (stride : PosInt) (hshape : shape.val > 1) :
+  let v2 := View.from_single_dimension shape stride
+  View.is_mergeable v1 v2 <->
+  ( ∃ (hmaxsize : v2.max_index ≤ v1.shape.max_index) (f : LinearIntegerFunc) (h_f : f.max_val = shape.val),
+    NatLt.embed_nat ∘ View.compose v1 v2 hmaxsize = f.fun
+      ∘ (h_f ▸ (View.from_shape_shape_eq [shape] ▸ @IndexSet.from_single_dimension_equiv shape))) := by
+  unfold View.is_mergeable
+  unfold View.is_merge
+
+
+
+
 
 
 theorem View.is_mergeable_single_dimension_right' (v1: View) (shape : PosInt) (stride : PosInt) (hshape : shape.val > 1) :
@@ -154,6 +232,10 @@ theorem View.is_mergeable_single_dimension_right (v1: View) (shape : PosInt) (st
     = (v1.to_unraveled_index_fn ⟨ i * stride, by apply lemma_index_stride_in_shape; assumption; omega ⟩ : Nat)
     + v1.to_unraveled_index_fn ⟨ stride, by apply lemma_index_stride_in_shape_first_step; repeat assumption ⟩))
     := by
+    unfold View.is_mergeable
+
+
+
     constructor
 
     . intro h_merge
@@ -213,6 +295,15 @@ theorem View.is_mergeable_single_dimension_right (v1: View) (shape : PosInt) (st
 
       simp [View.from_single_dimension, View.to_index_fn_safe, View.to_unraveled_index_fn] at h_merge_eq_i
       simp [View.to_index_fn_safe, List.toNats, List.inner_prod, List.map, List.zipWith] at h_merge_eq_i
+
+      have h_index_fn_eq : v.to_index_fn_safe =
+        cast (by rw [hv_eq]) (from_single_dimension vshape vstride).to_index_fn_safe := by
+        rw [hv_eq]
+
+      have h_compose_eq : NatLt.embed_nat ∘ v.to_index_fn_safe =
+        NatLt.embed_nat ∘ (cast (by rw [hv_eq]) (from_single_dimension vshape vstride).to_index_fn_safe) := by
+        congr
+        exact h_index_fn_eq
 
       sorry
 

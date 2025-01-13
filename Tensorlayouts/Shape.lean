@@ -585,6 +585,12 @@ theorem View.from_single_dimension_index_fn_safe_linear (shape stride : PosInt) 
   rw [Nat.mul_comm]
 
 
+theorem View.len_1_from_single_dimension (v: View) (hlen: v.shape.length = 1) :
+  ∃ (shape stride : PosInt), v = View.from_single_dimension shape stride := by
+  sorry
+
+
+
 /-- ## Unraveling -/
 
 def unravel_unsafe (s : Shape) : Nat -> List Nat :=

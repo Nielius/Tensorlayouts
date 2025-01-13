@@ -63,6 +63,7 @@ instance : Std.Commutative (α := PosInt) (· * ·) := ⟨PosInt.mul_comm⟩
 
 abbrev NatLt (n : Nat) : Type := { idx : Nat // idx < n }
 
+@[simp]
 def NatLt.embedding {n m : Nat} (h : n ≤ m) : NatLt n -> NatLt m :=
   fun x => ⟨x.val, Nat.lt_of_lt_of_le x.property h⟩
 

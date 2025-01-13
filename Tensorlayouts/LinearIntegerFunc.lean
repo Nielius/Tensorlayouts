@@ -24,7 +24,7 @@ theorem LinearIntegerFunc.increment : ∀ (f : LinearIntegerFunc) (i : Nat) (hi 
   simp
   apply Nat.mul_succ
 
-theorem LinearIntegerFunc.fun_eq_slope : ∀ (f : LinearIntegerFunc) (g : NatLt f.max_val → Nat),
+theorem LinearIntegerFunc.fun_eq_conditions : ∀ (f : LinearIntegerFunc) (g : NatLt f.max_val → Nat),
   f.fun = g ↔
   ∃ hslope : (g ⟨1, f.max_val.property ⟩ = f.slope),
   (∀ (i : Nat) (hi : i < f.max_val - 1),
@@ -67,3 +67,11 @@ theorem LinearIntegerFunc.fun_eq_slope : ∀ (f : LinearIntegerFunc) (g : NatLt 
     -- 1. induction on n.val (but how? create a new theorem with a slightly different framing?)
     -- 2. define induction theorem NatLt.induction (see ArithHelpers.lean)
     sorry
+
+
+theorem LinearIntegerFunc.existence_conditions {k : Nat} (hk : k > 1) (g : NatLt k → Nat) :
+  ∃ (f : LinearIntegerFunc) (hmax_val : f.max_val = ⟨k, hk⟩),
+  f.fun = hmax_val ▸ g ↔
+  (∀ (i : Nat) (hi : i < k - 1),
+    g ⟨i + 1, by sorry⟩ = g ⟨i, by sorry⟩ + g ⟨ 1, hk ⟩) := by
+  sorry
