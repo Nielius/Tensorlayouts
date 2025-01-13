@@ -88,6 +88,22 @@ theorem NatLt.cast_comp_embedding {n m k : Nat} (hembed : n ≤ m) (heq : m = k)
 --   Eq.rec (motive := fun x h ↦ NatLt k → NatLt x) id hshape_fn
 
 
+/- This may be worth completing at some point:
+
+theorem NatLt.induction {k : Nat} {P : NatLt k → Prop}
+  (h0 : P ⟨0, sorry⟩)
+  (hstep : ∀ (n : NatLt k), P n → n.1 + 1 < k → P ⟨n.1 + 1, sorry⟩)
+  : ∀ (n : NatLt k), P n := by
+  intro n
+  -- First show n.1 is actually a Nat
+  have hn_nat : 0 ≤ n.1 := sorry -- This follows from n.1 < k
+
+  -- Now we can use Nat induction
+  exact Nat.strong_induction_on (Int.toNat n.1) (λ m hm ↦ sorry)
+-/
+
+
+
 
 /-- ## scanr lemmas -/
 

@@ -1,8 +1,10 @@
 import Aesop
 import Tensorlayouts.ArithHelpers
 import Tensorlayouts.CastingLemmas
+import Tensorlayouts.LinearIntegerFunc
 import Mathlib.Data.List.Basic -- needed for e.g. List.scanr_nil; this is part of simp
 import Mathlib.Data.List.Zip -- needed for List.zipWith_map_right
+import Mathlib.Logic.Equiv.Basic
 
 /- ## Shape and Stride -/
 
@@ -147,6 +149,31 @@ The type of valid indices for a given shape
 -/
 def IndexSet (s : Shape) : Type :=
   {idx : List Nat // Shape.is_valid_index s idx}
+
+
+@[simps! apply symm_apply]
+def IndexSet.from_single_dimension_equiv {shape : PosInt} :
+  IndexSet [shape] ≃ NatLt shape where
+  toFun x := ⟨x.val.head (fun hempty => by
+    have h : _ := x.property
+    unfold Shape.is_valid_index at h
+    obtain ⟨hlen, hvalid⟩ := h
+    simp at hlen
+    rw [hempty] at hlen
+    simp at hlen
+    ), by
+        have h : _ := x.property
+        unfold Shape.is_valid_index at h
+        obtain ⟨hlen, hvalid⟩ := h
+        have hvalid' := hvalid 0 (by rw [hlen]; simp)
+        simp at hvalid'
+        rw [List.head_eq_getElem_zero]
+        assumption
+     ⟩
+  invFun x := ⟨[x.val], by sorry⟩
+  left_inv := by sorry
+  right_inv := by sorry
+
 
 /--
 s : Shape
@@ -367,6 +394,26 @@ theorem View.from_shape_stride_shape_length_eq (s: Shape) : (List.length s) = (V
   unfold Stride.from_shape
   rw [List.scanr_length_tail]
 
+def View.from_single_dimension (shape stride : PosInt) : View := {
+  shape := [shape],
+  stride := [stride],
+  lengthEq := by simp
+}
+
+theorem View.from_single_dimension_shape_eq (shape stride : PosInt) :
+  (View.from_single_dimension shape stride).shape = [shape] := by
+  unfold View.from_single_dimension
+  simp
+
+theorem View.from_single_dimension_stride_eq (shape stride : PosInt) :
+  (View.from_single_dimension shape stride).stride = [stride] := by
+  unfold View.from_single_dimension
+  simp
+
+
+
+/-- ### Index functions -/
+
 def View.to_index_fn_unsafe (v : View) : List Nat → Option Nat
   | [] => if v.shape.length = 0 then some 0 else none
   | idx => if idx.length = v.shape.length then
@@ -437,6 +484,33 @@ theorem View.max_index_from_shape (s : Shape) : (View.from_shape s).max_index = 
     apply hd.property
 
 
+theorem View.from_single_dimension_max_index_eq : ∀ (shape stride : PosInt),
+  (View.from_single_dimension shape stride).max_index = (shape - 1) * stride + 1 := by
+  intro shape stride
+  unfold View.from_single_dimension
+  unfold View.max_index
+  simp [List.inner_prod, List.toNats]
+  apply Nat.mul_comm
+
+theorem View.from_single_dimension_max_index_le : ∀ (shape stride : PosInt),
+  (View.from_single_dimension shape stride).max_index ≤ shape * stride := by
+  intro shape stride
+  rw [View.from_single_dimension_max_index_eq]
+  rw [Nat.mul_comm]
+
+  have hstride_pos : 1 ≤ stride.val := stride.property
+  have hshape_pos : 1 ≤ shape.val := shape.property
+  calc
+    (stride : Nat) * (shape - 1) + 1 ≤ stride * (shape - 1) + stride := by sorry
+    _ = stride * (shape - 1 + 1) := by apply Nat.mul_add_one
+    _ = stride * shape := by rw [Nat.sub_add_cancel hshape_pos]
+
+  rw [Nat.mul_comm]
+
+
+-- theorem View.from_single_dimension_index_set_eq : ∀ (shape stride : PosInt),
+--   (View.from_single_dimension shape stride).to_index_fn_unsafe = (fun idx => (shape - 1) * stride + idx) := by
+
 
 
 def View.to_index_fn_safe (v : View) : (IndexSet v.shape) -> NatLt v.max_index :=
@@ -478,6 +552,37 @@ def View.to_index_fn_safe (v : View) : (IndexSet v.shape) -> NatLt v.max_index :
 
 example : View :=
   View.from_shape [⟨2, by simp⟩, ⟨3, by simp⟩, ⟨54, by simp⟩]
+
+
+theorem View.from_single_dimension_index_fn_safe_eq (shape stride : PosInt) :
+  (View.from_single_dimension shape stride).to_index_fn_safe =
+  (fun idx => ⟨ (IndexSet.from_single_dimension_equiv idx).val * stride, by sorry ⟩) := by
+  funext idx
+
+  match idx with
+  | ⟨idx_val, idx_bds⟩ =>
+    match idx_val with
+    | [] => sorry -- some contradiction here
+    | idx_val_head :: idx_val_tail =>
+      have idx_val_tail_eq : idx_val_tail = [] := by
+        sorry
+
+      simp [View.to_index_fn_safe, List.toNats, List.inner_prod, List.map, List.zipWith]
+      rw [Nat.mul_comm]
+
+
+theorem View.from_single_dimension_index_fn_safe_linear (shape stride : PosInt) (hshape : shape.val > 1) :
+  NatLt.embed_nat ∘ (View.from_single_dimension shape stride).to_index_fn_safe =
+  ({ slope := stride, max_val := ⟨ shape.val, hshape ⟩ } : LinearIntegerFunc).fun ∘ IndexSet.from_single_dimension_equiv  := by
+
+  rw [View.from_single_dimension_index_fn_safe_eq]
+  unfold LinearIntegerFunc.fun
+  simp
+  funext idx
+  simp
+  unfold NatLt.embed_nat
+  simp
+  rw [Nat.mul_comm]
 
 
 /-- ## Unraveling -/
