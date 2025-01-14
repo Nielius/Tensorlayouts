@@ -20,6 +20,3 @@ the unification fails in that case. -/
 theorem fun_cast_compose_higher_order (x x' : α) (f : T x -> β) (g : β -> γ) (h : x = x') : h ▸ (g ∘ f) = (g ∘ (h ▸ f)) := by
   subst h
   simp
-
-
-#print fun_cast_compose

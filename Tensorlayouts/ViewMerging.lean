@@ -122,7 +122,7 @@ theorem View.is_merge_implies_shape_eq (v v1 v2 : View) (h_merge : View.is_merge
 theorem View.is_mergeable_single_dimension_right_implies_linear_function (v1: View) (shape : PosInt) (stride : PosInt) (hshape : shape.val > 1) (v: View) :
   let v2 := View.from_single_dimension shape stride
   let stride' := v1.to_unraveled_index_fn ⟨stride, by sorry ⟩
-  (View.is_merge v v1 v2) → v = ({ shape := [shape], stride := [⟨stride', by sorry ⟩], lengthEq := by simp } : View) := by
+  (View.is_merge v v1 v2) → v = View.from_single_dimension shape ⟨stride'.val, by sorry ⟩ := by
 
   intro v2
   intro stride'
@@ -178,11 +178,74 @@ theorem View.is_mergeable_single_dimension_right_exists_linear_function (v1: Vie
   ( ∃ (hmaxsize : v2.max_index ≤ v1.shape.max_index) (f : LinearIntegerFunc) (h_f : f.max_val = shape.val),
     NatLt.embed_nat ∘ View.compose v1 v2 hmaxsize = f.fun
       ∘ (h_f ▸ (View.from_shape_shape_eq [shape] ▸ @IndexSet.from_single_dimension_equiv shape))) := by
-  unfold View.is_mergeable
-  unfold View.is_merge
 
+  intro v2
 
+  constructor
 
+  . intro h_is_mergeable
+    unfold View.is_mergeable at h_is_mergeable
+    obtain ⟨v, hv_is_merge⟩ := h_is_mergeable
+
+    let stride' := v1.to_unraveled_index_fn ⟨stride, by sorry ⟩
+
+    have : _ := View.is_mergeable_single_dimension_right_implies_linear_function v1 shape stride hshape v hv_is_merge
+    subst this
+
+    unfold View.is_merge at hv_is_merge
+    simp at hv_is_merge
+    obtain ⟨_ , hmaxsize, h_merge_fun_eq ⟩ := hv_is_merge
+
+    exists hmaxsize
+    let f : LinearIntegerFunc := { slope := stride', max_val := ⟨shape , by sorry ⟩}
+    exists f
+    have h_f : f.max_val = shape.val := by
+      simp
+    exists h_f
+    /- Idea: h_merge_fun_eq shows that is equal to some linear function-/
+    rw [View.from_single_dimension_index_fn_safe_linear] at h_merge_fun_eq
+    apply Eq.symm
+    rw [<- h_merge_fun_eq]
+
+  . intro h_exists
+    /- Proof overview:
+    - the composition is equal to some linear function
+    - from the linear function, we can create a view
+    - the index function of the view is the linear function, by construction
+    - this shows that it is the merge
+    -/
+    obtain ⟨hmaxsize, f, h_f, h_merge_fun_eq⟩ := h_exists
+
+    unfold View.is_mergeable
+    unfold View.is_merge
+
+    let v := View.from_linear_function f
+
+    exists v
+
+    have hshape : v2.shape = v.shape := by
+      rw [View.from_linear_function_shape_eq]
+      repeat rw [View.from_single_dimension_shape_eq]
+      rw [List.singleton_inj]
+      apply Subtype.ext
+      rw [h_f]
+
+    exists hshape
+    exists hmaxsize
+    simp
+
+    rw [<- fun_cast_compose_higher_order]
+    unfold v
+    rw [View_from_linear_function_to_linear_function]
+    rw [h_merge_fun_eq]
+    simp
+    rw [fun_cast_compose_higher_order]
+    apply congrArg (fun x => f.fun ∘ x)
+    funext idx
+    unfold IndexSet.from_single_dimension_equiv
+    simp
+    subst_eqs
+    simp
 
 
 

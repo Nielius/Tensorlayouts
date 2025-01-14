@@ -589,6 +589,19 @@ theorem View.len_1_from_single_dimension (v: View) (hlen: v.shape.length = 1) :
   ∃ (shape stride : PosInt), v = View.from_single_dimension shape stride := by
   sorry
 
+def View.from_linear_function (f : LinearIntegerFunc) : View :=
+  View.from_single_dimension ⟨f.max_val, by sorry ⟩ ⟨f.slope, by sorry ⟩
+
+theorem View_from_linear_function_to_linear_function (f : LinearIntegerFunc) :
+  NatLt.embed_nat ∘ (View.from_linear_function f).to_index_fn_safe = f.fun ∘ IndexSet.from_single_dimension_equiv := by
+  sorry
+
+theorem View.from_linear_function_shape_eq (f : LinearIntegerFunc) :
+  (View.from_linear_function f).shape = [⟨f.max_val, by sorry ⟩] := by
+  unfold View.from_linear_function
+  unfold View.from_single_dimension
+  simp
+
 
 
 /-- ## Unraveling -/
