@@ -410,6 +410,45 @@ theorem View.from_single_dimension_stride_eq (shape stride : PosInt) :
   unfold View.from_single_dimension
   simp
 
+theorem View.induction (P : View → Prop)
+  (nil : P ⟨[], [], rfl⟩)
+  (cons : ∀ (x : PosInt) (xs : Shape) (y : PosInt) (ys : Stride)
+          (h : xs.length = ys.length)
+          (ih : P ⟨xs, ys, h⟩),
+          P ⟨x::xs, y::ys, congrArg Nat.succ h⟩) :
+  ∀ (v : View), P v := by
+  intro v
+  cases v with
+  | mk shape stride lengthEq =>
+    -- Do induction on shape, but we need to handle stride in parallel
+    revert stride
+    induction shape with
+    | nil =>
+      -- In nil case, stride must also be nil due to length equality
+      intros stride lengthEq
+      have strideNil : stride = [] := by
+        rw [List.length_nil] at lengthEq
+        apply List.eq_nil_of_length_eq_zero
+        exact Eq.symm lengthEq
+      subst strideNil
+      exact nil
+
+    | cons head tail ih =>
+      -- In cons case, stride must be non-empty due to length equality
+      intros stride lengthEq
+      cases stride with
+      | nil =>
+        rw [List.length] at lengthEq
+        simp at lengthEq
+      | cons y ys =>
+        -- Use the inductive hypothesis with the tails
+        have tailLenEq : tail.length = ys.length := by
+          rw [List.length_cons] at lengthEq
+          rw [List.length_cons] at lengthEq
+          exact Nat.succ.inj lengthEq
+
+        have ihP := ih ys tailLenEq
+        exact cons head tail y ys tailLenEq ihP
 
 
 /-- ### Index functions -/
