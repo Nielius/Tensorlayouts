@@ -1,8 +1,11 @@
 import Tensorlayouts.Shape
 import Tensorlayouts.ExperimentFunCast
+import Tensorlayouts.Utils
 
 import Mathlib.Data.Set.Basic
+import Mathlib.Logic.Basic
 
+/- ## Definitions of composing and merging views -/
 
 def View.compose (v1: View) (v2: View) (h: v2.max_index ≤ v1.shape.max_index) : IndexSet v2.shape -> NatLt v1.max_index :=
   v1.to_unraveled_index_fn ∘ NatLt.embedding h ∘ v2.to_index_fn_safe
@@ -24,7 +27,16 @@ def View.is_mergeable  (v1 : View) (v2 : View) : Prop :=
   ∃(v: View), v.is_merge v1 v2
 
 
--- set_option pp.parens true
+/- ## Basic theorems about composing and merging views -/
+
+theorem View.is_merge_implies_shape_eq (v v1 v2 : View) (h_merge : View.is_merge v v1 v2) : v.shape = v2.shape := by
+  obtain ⟨hshape, hmaxsize, h_merge_eq⟩ := h_merge
+  exact Eq.symm hshape
+
+
+
+
+/-- An example of a mergeable view: if the left is canonical, then any view is mergeable with it -/
 theorem View.is_mergeable_left_canonical (s : Shape) (v2 : View) (hmaxsize : v2.max_index ≤ s.max_index) :
   View.is_mergeable (View.from_shape s) v2 := by
   exists v2
@@ -34,6 +46,7 @@ theorem View.is_mergeable_left_canonical (s : Shape) (v2 : View) (hmaxsize : v2.
   have hshape : v2.shape = v2.shape := by rfl
   exists hshape
   exists hmaxsize
+
 
   have h_unravel_correct_fn : _ := unravel_correct_fn'' s
   obtain ⟨hshape_fn, hcorrect_fn⟩ := h_unravel_correct_fn
@@ -55,6 +68,240 @@ theorem View.is_mergeable_left_canonical (s : Shape) (v2 : View) (hmaxsize : v2.
   rw [NatLt.embed_nat_comp_embedding]
 
 
+/- ## Merging cons -/
+
+section MergingCons
+
+variable (shape' stride' : PosInt) (v : View) (v1 : View) (shape : PosInt) (stride : PosInt) (v2 : View)
+
+theorem View.cons_to_index_fn_safe_zero (x : IndexSet [shape]) :
+  NatLt.embed_nat ((View.cons shape stride v2).to_index_fn_safe (IndexSet.cons_embed x)) = x.val.head (by sorry) * stride
+  := by
+  simp [View.cons, View.to_index_fn_safe, List.toNats, List.inner_prod, IndexSet.cons_embed, IndexSet.zero]
+  conv =>
+    lhs
+    enter [1, 1, 2]
+    rw [List.zipWith_map_left]
+    enter [1]
+    rw [v2.lengthEq]
+    rw [List.zipWith_replicate_right]
+    simp
+
+  have : ∀ n, (List.replicate n 0).sum = 0 := by
+    intro n
+    unfold List.sum
+    induction n
+    case zero =>
+      simp
+    case succ n ih =>
+      rw [List.replicate_succ]
+      simp
+      assumption
+
+  conv =>
+    pattern (List.replicate _ 0).sum
+    rw [this (List.length v2.stride)]
+
+  simp [NatLt.embed_nat]
+  apply Nat.mul_comm
+
+theorem View.cons_to_index_fn_safe_zero_as_index_fn  :
+  NatLt.embed_nat ∘ (View.cons shape stride v2).to_index_fn_safe ∘ IndexSet.cons_embed =
+  NatLt.embed_nat ∘ (View.from_single_dimension shape stride).to_index_fn_safe
+  := by
+  funext x
+  have := View.cons_to_index_fn_safe_zero shape stride v2 x
+  simp at *
+  rw [this]
+  rw [View.from_single_dimension_index_fn_safe_eq]
+  simp [NatLt.embed_nat]
+
+
+theorem View.cons_to_index_fn_safe_zero_as_index_fn' (x : IndexSet [shape]) :
+  ((View.cons shape stride v2).to_index_fn_safe ∘ IndexSet.cons_embed) x =
+  ((View.from_single_dimension shape stride).to_index_fn_safe x : Nat) := by
+  have := congrFun (View.cons_to_index_fn_safe_zero_as_index_fn shape stride v2) x
+  simp [NatLt.embed_nat] at *
+  assumption
+
+
+
+set_option pp.proofs true
+set_option pp.coercions true
+-- pp.deepTerms
+
+
+
+theorem View.is_merge_cons_as_cons_of_head :
+  (View.cons shape' stride' v).is_merge v1 (View.cons shape stride v2) →
+  (View.from_single_dimension shape' stride').is_merge v1 (View.from_single_dimension shape stride) := by
+
+  intro h_merge
+  unfold View.is_merge at h_merge
+  obtain ⟨hshape, hmaxsize, h_merge_eq⟩ := h_merge
+
+  /- Try to change the annoying Eq.rec-/
+
+  dsimp at h_merge_eq
+  conv at h_merge_eq =>
+    lhs
+    rw [← fun_cast_compose_higher_order]
+
+
+  have hshape' : shape = shape' := by
+    repeat rw [View.cons_shape_eq] at hshape
+    rw [List.cons_eq_cons] at hshape
+    obtain ⟨hshape_eq, _⟩ := hshape
+    assumption
+  subst hshape'
+
+  have hvshape : v2.shape = v.shape := by
+    repeat rw [View.cons_shape_eq] at hshape
+    rw [List.cons_eq_cons] at hshape
+    obtain ⟨_, hvshape_eq⟩ := hshape
+    assumption
+
+
+  have hshape_eq : (View.from_single_dimension shape stride').shape = (View.from_single_dimension shape stride).shape := by
+    rw [View.from_single_dimension_shape_eq]
+    rw [View.from_single_dimension_shape_eq]
+    repeat rw [View.cons_shape_eq] at hshape
+
+  unfold View.is_merge
+  exists Eq.symm hshape_eq
+
+  have hmaxsize_head : (View.from_single_dimension shape stride).max_index ≤ v1.shape.max_index := by
+    rw [View.cons_max_index] at hmaxsize
+    rw [View.from_single_dimension_max_index_eq]
+    calc
+      (↑shape - 1) * ↑stride + 1 ≤ (↑shape - 1) * ↑stride + v2.max_index := by
+        apply Nat.add_le_add_left
+        apply View.max_index_is_positive
+      _ ≤ v1.shape.max_index := by assumption
+  exists hmaxsize_head
+
+  /- Main idea:
+
+  - We have the functional equality from (View.cons shape' stride' v).is_merge v1 (View.cons shape stride v2)
+  - We precompose this with the equivalence of the index sets; and embed the IndexSet [shape] into the IndexSet (cons shape' stride' v).shape
+  - This composition is the merged index function
+  -/
+
+  have :          (cons shape stride v2).shape =           shape :: v2.shape := by rw [View.cons_shape_eq]
+  have : IndexSet (cons shape stride v2).shape = IndexSet (shape :: v2.shape) := by apply congrArg; assumption
+  have h_cons_equiv : IndexSet (cons shape stride v2).shape ≃ IndexSet [shape] × IndexSet v2.shape := by apply IndexSet.cons_equiv
+
+  have := congrArg (fun x => x ∘ IndexSet.cons_embed) h_merge_eq
+  simp at this
+
+  funext x
+
+
+  have h_merge_eq_applied := congrFun this x
+  unfold View.compose at h_merge_eq_applied
+  repeat rw [Function.comp_assoc] at h_merge_eq_applied
+
+  simp at h_merge_eq_applied
+
+  unfold NatLt.embed_nat at *
+  simp at *
+
+  have h_cons_embed_eq : _ := congrFun (View.cons_to_index_fn_safe_zero_as_index_fn shape stride v2) x
+  simp [NatLt.embed_nat] at h_cons_embed_eq
+  have h_cons_embed_eq' : _ := congrFun (View.cons_to_index_fn_safe_zero_as_index_fn shape stride' v) x
+  simp [NatLt.embed_nat] at h_cons_embed_eq'
+
+  conv at h_merge_eq_applied =>
+    pattern (v1.to_unraveled_index_fn _)
+    enter [2, 1]
+    rw [h_cons_embed_eq]
+
+  -- simp [hvshape] at h_merge_eq_applied
+  /- change the location of the cast -/
+  conv at h_merge_eq_applied =>
+    lhs
+    rw [fun_cast_input_move_to_input]
+    unfold Function.comp
+    arg 1
+    simp
+
+  simp at h_merge_eq_applied
+
+
+  have : ((cons shape stride' v).to_index_fn_safe x.cons_embed) =
+     (cons shape stride' v).to_index_fn_safe (@Eq.rec Shape (cons shape stride v2).shape (fun x h ↦ IndexSet x) x.cons_embed (cons shape stride' v).shape
+     (Eq.symm (is_merge.proof_2 (cons shape stride' v) (cons shape stride v2) hshape))) := by
+
+     have : HEq (@IndexSet.cons_embed shape v.shape x : IndexSet (shape :: v.shape)) (@IndexSet.cons_embed shape v2.shape x : IndexSet (shape :: v2.shape)) := by
+      unfold IndexSet.cons_embed
+      rw [hvshape]
+
+     apply congrArg
+     rw [<- heq_iff_eq]
+     rw [heq_rec_iff_heq]
+     assumption
+
+  -- GEBLEVEN
+
+  rw [this] at h_merge_eq_applied
+
+  have : (@Eq.rec Shape (cons shape stride v2).shape (fun x h ↦ IndexSet x) (@IndexSet.cons_embed shape v2.shape x) (cons shape stride' v).shape) = @IndexSet.cons_embed shape v.shape x := by
+    simp
+  subst_eqs
+
+  change v2.shape with v.shape at h_merge_eq_applied
+  change x.cons_embed with v.shape at h_merge_eq_applied
+
+  simp at h_merge_eq_applied
+  subst_eqs
+
+
+
+
+  have : (is_merge.proof_2 (cons shape stride' v) (cons shape stride v2) hshape) ▸ x.cons_embed
+     = x.cons_embed := by
+
+
+  -- have : ((Eq.symm (is_merge.proof_2 (cons shape stride' v) (cons shape stride v2) hshape) : (cons shape stride v2).shape = (cons shape stride' v).shape) ▸ x.cons_embed)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+theorem View.is_merge_cons_as_cons_of_tail :
+  (View.cons shape' stride' v).is_merge v1 (View.cons shape stride v2) →
+  v.is_merge v1 v2 :=
+  by sorry
+
+
+
+
+
+theorem View.is_merge_cons (v : View)(v1 : View) (shape : PosInt) (stride : PosInt) (v2 : View) :
+  v.is_merge v1 (View.cons shape stride v2) →
+  View.is_merge v1 v2 ∧ View.is_merge v1 (View.from_single_dimension shape stride)
+  := by
+  sorry
+
+end MergingCons
+
+
+/- ## Lemmas about indices -/
 section IndexLemmasForTheorem
 variable (shape : PosInt) (stride : PosInt) (k : Nat)
 
@@ -114,10 +361,7 @@ theorem lemma_index_in_shape'' (hidx_bound : shape * stride ≤ k) (hshape: shap
 end IndexLemmasForTheorem
 
 
-theorem View.is_merge_implies_shape_eq (v v1 v2 : View) (h_merge : View.is_merge v v1 v2) : v.shape = v2.shape := by
-  obtain ⟨hshape, hmaxsize, h_merge_eq⟩ := h_merge
-  exact Eq.symm hshape
-
+/- ## Relating mergeability to linear functions -/
 
 theorem View.is_mergeable_single_dimension_right_implies_linear_function (v1: View) (shape : PosInt) (stride : PosInt) (hshape : shape.val > 1) (v: View) :
   let v2 := View.from_single_dimension shape stride
@@ -174,7 +418,7 @@ theorem View.is_mergeable_single_dimension_right_implies_linear_function (v1: Vi
 
 theorem View.is_mergeable_single_dimension_right_exists_linear_function (v1: View) (shape : PosInt) (stride : PosInt) (hshape : shape.val > 1) :
   let v2 := View.from_single_dimension shape stride
-  View.is_mergeable v1 v2 <->
+  View.is_mergeable v1 v2 ↔
   ( ∃ (hmaxsize : v2.max_index ≤ v1.shape.max_index) (f : LinearIntegerFunc) (h_f : f.max_val = shape.val),
     NatLt.embed_nat ∘ View.compose v1 v2 hmaxsize = f.fun
       ∘ (h_f ▸ (View.from_shape_shape_eq [shape] ▸ @IndexSet.from_single_dimension_equiv shape))) := by
@@ -249,6 +493,22 @@ theorem View.is_mergeable_single_dimension_right_exists_linear_function (v1: Vie
 
 
 
+theorem View.is_mergeable_multiple_dimensions_reduces_to_single_dimension (v1: View) (v2: View) (shape : PosInt) (stride : PosInt) :
+  let v2' : View := View.cons shape stride v2
+  View.is_mergeable v1 v2' ↔
+  View.is_mergeable v1 v2 ∧ View.is_mergeable v1 (View.from_single_dimension shape stride)
+  := by
+  constructor
+  . intro h_merge
+    unfold View.is_mergeable at *
+    obtain ⟨v, hv_merge⟩ := h_merge
+    unfold View.is_merge at *
+
+
+
+
+
+
 theorem View.is_mergeable_single_dimension_right' (v1: View) (shape : PosInt) (stride : PosInt) (hshape : shape.val > 1) :
   View.is_mergeable v1 (View.from_single_dimension shape stride) <->
   ( ∃ (hidx_bound : (shape - 1) * stride + 1 ≤ v1.shape.max_index),
@@ -261,23 +521,13 @@ theorem View.is_mergeable_single_dimension_right' (v1: View) (shape : PosInt) (s
     = (v1.to_unraveled_index_fn ⟨ i * stride, by apply lemma_index_stride_in_shape; assumption; omega ⟩ : Nat)
     + v1.to_unraveled_index_fn ⟨ stride, by apply lemma_index_stride_in_shape_first_step; repeat assumption ⟩))
     := by
-    constructor
 
-    . intro h_merge
-      obtain ⟨v_merge, hshape, h_merge_fn⟩ := h_merge
-      obtain ⟨hmaxsize, h_merge_eq⟩ := h_merge_fn
+    have : _ := View.is_mergeable_single_dimension_right_exists_linear_function v1 shape stride hshape
+    dsimp at this
+    rw [this]
 
-      have h_v_merge : ∃ (shape stride : PosInt), v_merge = View.from_single_dimension shape stride := by
-        sorry
-
-      have hidx_bound : (↑shape - 1) * ↑stride + 1 ≤ v1.shape.max_index := by
-        rw [View.from_single_dimension_max_index_eq] at hmaxsize
-        exact hmaxsize
-      exists hidx_bound
-
-      intros i hi
-      sorry
-    . sorry
+    /- Idea of the proof: this is basically an application of LinearIntegerFunc.existence_conditions -/
+    sorry
 
 
 
@@ -381,26 +631,12 @@ theorem View.is_mergeable_single_dimension_right (v1: View) (shape : PosInt) (st
 
 /-
 
-Both proofs use the following:
+
+/- Theorems that are next:
 
 
-
-     the linear function from the merged view          =        the composition
-           iff
-
-     (1) the first step is equal
-     (2) we keep adding the same step
-
-
-  Better:
-
-  to check that a function (in this case, the composition) is equal to a linear function,
-  you can check that the first increment is correct, and that the difference between every two steps is the same as that first increment
-
-  so this is perhaps something we need to prove first
-
-
-  THIS IS THE MAIN PROBLEM NOW ^^^^
-  basically about linear functions with integer steps
+1. Overflows: express the equality conditions by only looking at the overflows, giving equations on the strides
+2. v2 with length > 1
+3. composing several views?
 
 -/

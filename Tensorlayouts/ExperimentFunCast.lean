@@ -20,3 +20,9 @@ the unification fails in that case. -/
 theorem fun_cast_compose_higher_order (x x' : α) (f : T x -> β) (g : β -> γ) (h : x = x') : h ▸ (g ∘ f) = (g ∘ (h ▸ f)) := by
   subst h
   simp
+
+
+
+theorem fun_cast_input_move_to_input (x x' : α) (f : T x -> β) (h : x = x') {a : T x'} : (h ▸ f) a = f (h ▸ a) := by
+  subst h
+  simp

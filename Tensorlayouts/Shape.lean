@@ -77,8 +77,9 @@ def Stride.from_shape_cons (hd : PosInt) (tl : List PosInt) :
 /- ## Indexing for shapes -/
 
 /--
- Upper bound for the index that the shape can represent
+ Strict upper bound for the index that the shape can represent
  in the shape's canonical view.
+ 'Strict' means strict inequality, i.e. idx < shape.max_index
 -/
 def Shape.max_index (shape : Shape) : Nat :=
   Nat.prod shape.toNats
@@ -150,6 +151,14 @@ The type of valid indices for a given shape
 def IndexSet (s : Shape) : Type :=
   {idx : List Nat // Shape.is_valid_index s idx}
 
+def IndexSet.zero (shape : Shape) : IndexSet shape :=
+  ⟨ (List.map (fun x => 0) shape), by
+      unfold Shape.is_valid_index
+      simp
+      intros i hi_bound
+      exact (shape.get ⟨i, hi_bound⟩).property
+  ⟩
+
 
 @[simps! apply symm_apply]
 def IndexSet.from_single_dimension_equiv {shape : PosInt} :
@@ -173,6 +182,19 @@ def IndexSet.from_single_dimension_equiv {shape : PosInt} :
   invFun x := ⟨[x.val], by sorry⟩
   left_inv := by sorry
   right_inv := by sorry
+
+@[simps! apply symm_apply]
+def IndexSet.cons_equiv {shapeHead : PosInt} {shapeTail : Shape} :
+  IndexSet (shapeHead :: shapeTail) ≃ IndexSet [shapeHead] × IndexSet shapeTail
+  where
+  toFun x := ⟨⟨ [x.val.head (by sorry)], by sorry ⟩, ⟨x.val.tail, by sorry ⟩⟩
+  invFun := fun (idxHead, idxTail) => ⟨idxHead.val.head (by sorry) :: idxTail.val, by sorry⟩
+  left_inv := by sorry
+  right_inv := by sorry
+
+def IndexSet.cons_embed {shapeHead : PosInt} {shapeTail : Shape} :
+  IndexSet [shapeHead] → IndexSet (shapeHead :: shapeTail) :=
+  fun idx => ⟨idx.val.head (by sorry) :: (IndexSet.zero shapeTail).val, by sorry ⟩
 
 
 /--
@@ -410,8 +432,40 @@ theorem View.from_single_dimension_stride_eq (shape stride : PosInt) :
   unfold View.from_single_dimension
   simp
 
+def View.nil : View := {
+  shape := [],
+  stride := [],
+  lengthEq := by simp
+}
+
+theorem View.nil_shape_eq : (View.nil).shape = [] := by
+  unfold View.nil
+  simp
+
+theorem View.nil_stride_eq : (View.nil).stride = [] := by
+  unfold View.nil
+  simp
+
+def View.cons (shape: PosInt) (stride : PosInt): View -> View :=
+  fun v => {
+    shape := shape :: v.shape,
+    stride := stride :: v.stride,
+    lengthEq := congrArg Nat.succ v.lengthEq
+  }
+
+theorem View.cons_shape_eq (shape stride : PosInt) (v : View) :
+  (View.cons shape stride v).shape = shape :: v.shape := by
+  unfold View.cons
+  simp
+
+theorem View.cons_stride_eq (shape stride : PosInt) (v : View) :
+  (View.cons shape stride v).stride = stride :: v.stride := by
+  unfold View.cons
+  simp
+
+
 theorem View.induction (P : View → Prop)
-  (nil : P ⟨[], [], rfl⟩)
+  (nil : P View.nil)
   (cons : ∀ (x : PosInt) (xs : Shape) (y : PosInt) (ys : Stride)
           (h : xs.length = ys.length)
           (ih : P ⟨xs, ys, h⟩),
@@ -462,21 +516,35 @@ def View.to_index_fn_unsafe (v : View) : List Nat → Option Nat
             none
 
 /--
-  The smallest upper bound for the index that the view can represent.
+  The smallest strict upper bound for the index that the view can represent.
 
   This is equal to ∑_i (s_i - 1) σ_i + 1, where σ_i is the ith stride, and s_i is the ith size.
   This assumes all strides are positive! In theory you could have negative strides...
+  The ` + 1` at the end of this formula is to make it a strict upper bound,
+  so that it is compatible with Shape.max_index (as proven by View.max_index_from_shape).
 -/
 def View.max_index (v : View) : Nat :=
   v.stride.toNats.inner_prod (v.shape.toNats.map (fun x => x - 1)) + 1
 
-theorem View.max_index_cons :
-  ({ shape := shape_head :: shape_tail, stride := stride_head :: stride_tail, lengthEq := by sorry } : View).max_index
-  = (shape_head - 1) * stride_head + ({ shape := shape_tail, stride := stride_tail, lengthEq := by sorry } : View).max_index := by
+
+theorem View.cons_max_index :
+  (View.cons shape_head stride_head v).max_index
+  = (shape_head - 1) * stride_head + v.max_index := by
   unfold View.max_index
-  simp [List.toNats_cons, List.inner_prod_cons, List.map_cons, List.foldr_cons]
+  simp [View.cons, List.toNats_cons, List.inner_prod_cons, List.map_cons, List.foldr_cons]
   simp_arith
   apply Nat.mul_comm
+
+
+theorem View.nil_max_index : (View.nil).max_index = 1 := by
+  unfold View.max_index
+  simp [View.nil, List.toNats, List.inner_prod, List.map, List.foldr]
+
+
+theorem View.max_index_is_positive : ∀ (v : View), v.max_index > 0 := by
+  intro v
+  unfold View.max_index
+  simp [View.nil, List.toNats, List.inner_prod, List.map, List.foldr]
 
 
 theorem View.max_index_from_shape (s : Shape) : (View.from_shape s).max_index = s.max_index := by
@@ -530,6 +598,7 @@ theorem View.from_single_dimension_max_index_eq : ∀ (shape stride : PosInt),
   unfold View.max_index
   simp [List.inner_prod, List.toNats]
   apply Nat.mul_comm
+
 
 theorem View.from_single_dimension_max_index_le : ∀ (shape stride : PosInt),
   (View.from_single_dimension shape stride).max_index ≤ shape * stride := by
