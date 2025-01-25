@@ -121,6 +121,14 @@ theorem NatLt.embedding_subtype_val_eq_iff :
     simp at this
     assumption
 
+
+theorem NatLt.embedding_subtype_val_eq_iff_applied :
+  (∀ x, (Subtype.val ∘ f) x  = (Subtype.val ∘ g) x ) ↔ (∀ x, (NatLt.embedding h ∘ f) x = (NatLt.embedding h' ∘ g) x) := by
+  have := NatLt.embedding_subtype_val_eq_iff (f := f) (g := g) (h := h) (h' := h')
+  repeat rw [funext_iff] at this
+  assumption
+
+
 theorem NatLt.embed_nat_subtype_val_eq_iff :
   Subtype.val ∘ f = Subtype.val ∘ g ↔ NatLt.embed_nat ∘ f = NatLt.embed_nat ∘ g := by
   constructor
