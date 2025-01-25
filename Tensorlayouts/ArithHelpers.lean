@@ -86,8 +86,40 @@ theorem NatLt.cast_comp_embedding {n m k : Nat} (hembed : n ≤ m) (heq : m = k)
   subst heq
   simp
 
---   Eq.rec (motive := fun x h ↦ NatLt k → NatLt x) id hshape_fn
+@[simp] theorem NatLt.embed_nat_coe (x : NatLt n) : (NatLt.embed_nat x : Nat) = x := by unfold NatLt.embed_nat; rfl
+@[simp] theorem NatLt.embedding_nat_coe (x : NatLt n) (h : n ≤ m) : (NatLt.embedding h x : Nat) = x := by unfold NatLt.embedding; rfl
 
+theorem NatLt.embedding_subtype_val_eq_iff :
+  Subtype.val ∘ f = Subtype.val ∘ g ↔ NatLt.embedding h ∘ f = NatLt.embedding h' ∘ g := by
+  constructor
+  . intro h_eq
+    funext x
+    simp [h_eq]
+    have := congrFun h_eq x
+    simp at this
+    assumption
+  . intro h_eq
+    funext x
+    simp [h_eq]
+    have := congrFun h_eq x
+    simp at this
+    assumption
+
+theorem NatLt.embed_nat_subtype_val_eq_iff :
+  Subtype.val ∘ f = Subtype.val ∘ g ↔ NatLt.embed_nat ∘ f = NatLt.embed_nat ∘ g := by
+  constructor
+  . intro h_eq
+    funext x
+    simp [h_eq]
+    have := congrFun h_eq x
+    simp at this
+    assumption
+  . intro h_eq
+    funext x
+    simp [h_eq]
+    have := congrFun h_eq x
+    simp at this
+    assumption
 
 /- This may be worth completing at some point:
 

@@ -27,13 +27,66 @@ def View.is_mergeable  (v1 : View) (v2 : View) : Prop :=
   ∃(v: View), v.is_merge v1 v2
 
 
+theorem View.is_merge__helper (v2 v : View) (hshape : v2.shape = v.shape) :
+  (hshape ▸ v.to_index_fn_safe) =  v.to_index_fn_safe ∘ (cast (congrArg IndexSet hshape)) := by
+  sorry
+
+
+theorem View.is_merge_cast_formulation (v: View) (v1 : View) (v2 : View)  :
+  v.is_merge v1 v2 ↔
+  exists (hshape: v2.shape = v.shape)
+         (hmaxsize : v2.max_index ≤ v1.shape.max_index),
+  let hshape_fn :  (IndexSet v2.shape → NatLt v2.max_index) = (IndexSet v.shape → NatLt v2.max_index) := by congr
+    NatLt.embed_nat ∘ v.to_index_fn_safe ∘ (cast (congrArg IndexSet hshape))
+  = NatLt.embed_nat ∘ (View.compose v1 v2 hmaxsize) := by
+  constructor
+
+  /- there is probably a better way to do this; it's basically a rewrite with View.is_merge__helper -/
+  intro h_merge
+  obtain ⟨hshape, hmaxsize, h_merge_eq⟩ := h_merge
+  exists hshape
+  exists hmaxsize
+  rw [<- View.is_merge__helper v2 v hshape]
+  assumption
+
+  intro h_merge
+  obtain ⟨hshape, hmaxsize, h_merge_eq⟩ := h_merge
+  exists hshape
+  exists hmaxsize
+  rw [View.is_merge__helper v2 v hshape]
+  assumption
+
+
+theorem cast_indexset_eq__helper (s s' :Shape) (h : s = s') (x : IndexSet s) : x.val = (cast (congrArg IndexSet h) x).val := by
+  subst h
+  simp
+
+
+
+theorem cast_indexset_eq (shape stride : PosInt) (v : View) (shape' stride' : PosInt) (v' : View)
+  (h : (View.cons shape stride v).shape = (View.cons shape' stride' v').shape) :
+  (cast (congrArg IndexSet h)) ∘ IndexSet.cons_embed_tail =
+  IndexSet.cons_embed_tail ∘     (cast (congrArg IndexSet ((View.cons_shape_eq_cons_shape_iff (v := v') (v2 := v)).mp h).right)) := by
+  /- afaict, the only reason this is so difficult, is that subst does not work well with structure fields! -/
+  funext x
+  simp [IndexSet.cons_embed_tail]
+  rw [cast_eq_iff_heq]
+  rw [Subtype.heq_iff_coe_eq]
+  simp
+  apply cast_indexset_eq__helper
+  exact ((View.cons_shape_eq_cons_shape_iff (v := v') (v2 := v)).mp h).right
+
+  repeat rw [View.cons_shape_eq] at h
+  repeat rw [h]
+  simp
+
+
+
 /- ## Basic theorems about composing and merging views -/
 
 theorem View.is_merge_implies_shape_eq (v v1 v2 : View) (h_merge : View.is_merge v v1 v2) : v.shape = v2.shape := by
   obtain ⟨hshape, hmaxsize, h_merge_eq⟩ := h_merge
   exact Eq.symm hshape
-
-
 
 
 /-- An example of a mergeable view: if the left is canonical, then any view is mergeable with it -/
@@ -125,34 +178,116 @@ theorem View.cons_to_index_fn_safe_zero_as_index_fn' (x : IndexSet [shape]) :
   assumption
 
 
+theorem View.cons_max_index_embed_bound :
+  (View.from_single_dimension shape stride).max_index ≤ (View.cons shape stride v2).max_index := by
+  rw [View.from_single_dimension_max_index_eq]
+  rw [View.cons_max_index]
+  apply Nat.add_le_add_left
+  apply View.max_index_is_positive
 
-set_option pp.proofs true
-set_option pp.coercions true
--- pp.deepTerms
+theorem View.cons_max_index_embed_bound_tail :
+  v2.max_index ≤ (View.cons shape stride v2).max_index := by
+  rw [View.cons_max_index]
+  rw [Nat.add_comm]
+  apply Nat.le_add_right_of_le
+  simp
 
 
 
-theorem View.is_merge_cons_as_cons_of_head :
+/- Alternative:
+theorem View.cons_to_index_fn_safe_zero_as_index_fn''  :
+  (View.cons shape stride v2).to_index_fn_safe ∘ IndexSet.cons_embed =
+  NatLt.embedding (View.cons_max_index_embed_bound shape stride v2) ∘ (View.from_single_dimension shape stride).to_index_fn_safe
+-/
+
+theorem View.cons_to_index_fn_safe_zero_as_index_fn''  :
+  Subtype.val ∘ (View.cons shape stride v2).to_index_fn_safe ∘ IndexSet.cons_embed =
+  Subtype.val ∘ (View.from_single_dimension shape stride).to_index_fn_safe
+  := by
+  funext x
+  have := View.cons_to_index_fn_safe_zero shape stride v2 x
+  rw [View.from_single_dimension_index_fn_safe_eq]
+  simp
+  assumption_mod_cast
+
+
+theorem View.cons_to_index_fn_safe_zero_as_index_fn_tail  :
+  Subtype.val ∘ (View.cons shape stride v2).to_index_fn_safe ∘ IndexSet.cons_embed_tail =
+  Subtype.val ∘ v2.to_index_fn_safe
+  := by
+  funext x
+  simp [View.cons, View.to_index_fn_safe, IndexSet.cons_embed_tail]
+  rw [List.toNats_cons]
+  rw [List.inner_prod_cons]
+  simp
+  norm_cast
+
+
+theorem View.compose_cons (v1 : View) (shape stride : PosInt) (v2 : View) (h: (cons shape stride v2).max_index ≤ v1.shape.max_index) :
+  NatLt.embed_nat ∘ (v1.compose (cons shape stride v2) h) ∘ IndexSet.cons_embed
+  = NatLt.embed_nat ∘ (v1.compose (from_single_dimension shape stride) (Nat.le_trans (View.cons_max_index_embed_bound shape stride v2) h)) := by
+  have h' : (from_single_dimension shape stride).max_index ≤ v1.shape.max_index := by
+    rw [View.cons_max_index] at h
+    rw [View.from_single_dimension_max_index_eq]
+    calc
+      (↑shape - 1) * ↑stride + 1 ≤ (↑shape - 1) * ↑stride + v2.max_index := by
+        apply Nat.add_le_add_left
+        apply View.max_index_is_positive
+      _ ≤ v1.shape.max_index := by assumption
+
+  funext x
+  unfold View.compose
+  repeat rw [Function.comp_assoc]
+  unfold NatLt.embed_nat
+  simp
+
+  have := congrFun (View.cons_to_index_fn_safe_zero_as_index_fn'' shape stride v2) x
+  simp at this
+  conv =>
+    lhs
+    enter [1, 2, 1]
+    rw [this]
+
+
+theorem View.compose_cons_tail (v1 : View) (shape stride : PosInt) (v2 : View) (h: (cons shape stride v2).max_index ≤ v1.shape.max_index) :
+  NatLt.embed_nat ∘ (v1.compose (cons shape stride v2) h) ∘ IndexSet.cons_embed_tail
+  = NatLt.embed_nat ∘ (v1.compose v2 (Nat.le_trans (View.cons_max_index_embed_bound_tail shape stride v2) h))
+  := by
+  unfold View.compose
+  /- Idea of proof: this basically follows from the analogous statement on index functions-/
+
+  have : NatLt.embedding h ∘ (cons shape stride v2).to_index_fn_safe ∘ IndexSet.cons_embed_tail =
+     NatLt.embedding (Nat.le_trans (View.cons_max_index_embed_bound_tail shape stride v2) h) ∘ v2.to_index_fn_safe := by
+     /- This is just a small rewrite of View.cons_to_index_fn_safe_zero_as_index_fn_tail -/
+     have := View.cons_to_index_fn_safe_zero_as_index_fn_tail shape stride v2
+     apply NatLt.embedding_subtype_val_eq_iff.mp
+     assumption
+
+  repeat rw [Function.comp_assoc]
+  rw [this]
+
+
+/- Is this already in the lib?
+   https://github.com/leanprover-community/mathlib4/blob/ee78f4e232bcaca73d4b10671e595ee8111fdfc9/Mathlib/Logic/Basic.lean#L429-L431 -/
+theorem cast_heq_iff_heq {α β γ : Sort _} (e : α = β) (a : α) (c : γ) :
+    HEq (cast e a) c ↔ HEq a c := by subst e; rfl
+
+
+theorem View.cons_is_merge_cons_for_head :
   (View.cons shape' stride' v).is_merge v1 (View.cons shape stride v2) →
   (View.from_single_dimension shape' stride').is_merge v1 (View.from_single_dimension shape stride) := by
+  -- could add here:
+  --  - shape' = shape
+  --  - stride' = ....
+  -- although maybe it's better to put that in another theorem?
 
   intro h_merge
-  unfold View.is_merge at h_merge
-  obtain ⟨hshape, hmaxsize, h_merge_eq⟩ := h_merge
+  rw [View.is_merge_cast_formulation] at *
+  simp at *
 
-  /- Try to change the annoying Eq.rec-/
+  obtain ⟨hshape, hmaxsize, h_total_merge⟩ := h_merge
 
-  dsimp at h_merge_eq
-  conv at h_merge_eq =>
-    lhs
-    rw [← fun_cast_compose_higher_order]
-
-
-  have hshape' : shape = shape' := by
-    repeat rw [View.cons_shape_eq] at hshape
-    rw [List.cons_eq_cons] at hshape
-    obtain ⟨hshape_eq, _⟩ := hshape
-    assumption
+  obtain ⟨ hshape', _ ⟩ : _ := (View.cons_shape_eq_cons_shape_iff.mp hshape)
   subst hshape'
 
   have hvshape : v2.shape = v.shape := by
@@ -161,13 +296,10 @@ theorem View.is_merge_cons_as_cons_of_head :
     obtain ⟨_, hvshape_eq⟩ := hshape
     assumption
 
-
   have hshape_eq : (View.from_single_dimension shape stride').shape = (View.from_single_dimension shape stride).shape := by
     rw [View.from_single_dimension_shape_eq]
     rw [View.from_single_dimension_shape_eq]
-    repeat rw [View.cons_shape_eq] at hshape
 
-  unfold View.is_merge
   exists Eq.symm hshape_eq
 
   have hmaxsize_head : (View.from_single_dimension shape stride).max_index ≤ v1.shape.max_index := by
@@ -191,110 +323,92 @@ theorem View.is_merge_cons_as_cons_of_head :
   have : IndexSet (cons shape stride v2).shape = IndexSet (shape :: v2.shape) := by apply congrArg; assumption
   have h_cons_equiv : IndexSet (cons shape stride v2).shape ≃ IndexSet [shape] × IndexSet v2.shape := by apply IndexSet.cons_equiv
 
-  have := congrArg (fun x => x ∘ IndexSet.cons_embed) h_merge_eq
-  simp at this
-
   funext x
 
+  have h_total_merge_embed := congrArg (fun f => (f ∘ IndexSet.cons_embed) x) h_total_merge
+  simp at this
 
-  have h_merge_eq_applied := congrFun this x
-  unfold View.compose at h_merge_eq_applied
-  repeat rw [Function.comp_assoc] at h_merge_eq_applied
+  have : cast (congrArg IndexSet hshape) x.cons_embed = x.cons_embed := by
+    rw [<- heq_iff_eq]
+    rw [cast_heq_iff_heq]
+    unfold IndexSet.cons_embed
+    congr
+    rw [hvshape]
+    rw [hvshape]
 
-  simp at h_merge_eq_applied
+  simp at h_total_merge_embed
+  rw [this] at h_total_merge_embed
 
-  unfold NatLt.embed_nat at *
-  simp at *
+  /- Rewrite the index function for v -/
+  have := congrFun (View.cons_to_index_fn_safe_zero_as_index_fn shape stride' v) x
+  simp at this
+  rw [this] at h_total_merge_embed
 
-  have h_cons_embed_eq : _ := congrFun (View.cons_to_index_fn_safe_zero_as_index_fn shape stride v2) x
-  simp [NatLt.embed_nat] at h_cons_embed_eq
-  have h_cons_embed_eq' : _ := congrFun (View.cons_to_index_fn_safe_zero_as_index_fn shape stride' v) x
-  simp [NatLt.embed_nat] at h_cons_embed_eq'
-
-  conv at h_merge_eq_applied =>
-    pattern (v1.to_unraveled_index_fn _)
-    enter [2, 1]
-    rw [h_cons_embed_eq]
-
-  -- simp [hvshape] at h_merge_eq_applied
-  /- change the location of the cast -/
-  conv at h_merge_eq_applied =>
-    lhs
-    rw [fun_cast_input_move_to_input]
-    unfold Function.comp
-    arg 1
-    simp
-
-  simp at h_merge_eq_applied
+  /- Rewrite the cons for the composition -/
+  have := congrFun (View.compose_cons v1 shape stride v2 hmaxsize) x
+  simp [NatLt.embed_nat] at this
+  simp [NatLt.embed_nat]
+  rw [this] at h_total_merge_embed
+  assumption
 
 
-  have : ((cons shape stride' v).to_index_fn_safe x.cons_embed) =
-     (cons shape stride' v).to_index_fn_safe (@Eq.rec Shape (cons shape stride v2).shape (fun x h ↦ IndexSet x) x.cons_embed (cons shape stride' v).shape
-     (Eq.symm (is_merge.proof_2 (cons shape stride' v) (cons shape stride v2) hshape))) := by
-
-     have : HEq (@IndexSet.cons_embed shape v.shape x : IndexSet (shape :: v.shape)) (@IndexSet.cons_embed shape v2.shape x : IndexSet (shape :: v2.shape)) := by
-      unfold IndexSet.cons_embed
-      rw [hvshape]
-
-     apply congrArg
-     rw [<- heq_iff_eq]
-     rw [heq_rec_iff_heq]
-     assumption
-
-  -- GEBLEVEN
-
-  rw [this] at h_merge_eq_applied
-
-  have : (@Eq.rec Shape (cons shape stride v2).shape (fun x h ↦ IndexSet x) (@IndexSet.cons_embed shape v2.shape x) (cons shape stride' v).shape) = @IndexSet.cons_embed shape v.shape x := by
-    simp
-  subst_eqs
-
-  change v2.shape with v.shape at h_merge_eq_applied
-  change x.cons_embed with v.shape at h_merge_eq_applied
-
-  simp at h_merge_eq_applied
-  subst_eqs
-
-
-
-
-  have : (is_merge.proof_2 (cons shape stride' v) (cons shape stride v2) hshape) ▸ x.cons_embed
-     = x.cons_embed := by
-
-
-  -- have : ((Eq.symm (is_merge.proof_2 (cons shape stride' v) (cons shape stride v2) hshape) : (cons shape stride v2).shape = (cons shape stride' v).shape) ▸ x.cons_embed)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-theorem View.is_merge_cons_as_cons_of_tail :
+theorem View.cons_is_merge_cons_for_tail :
   (View.cons shape' stride' v).is_merge v1 (View.cons shape stride v2) →
-  v.is_merge v1 v2 :=
-  by sorry
+  v.is_merge v1 v2 := by
 
+  intro h_merge
+  rw [View.is_merge_cast_formulation] at *
+  simp at *
+  obtain ⟨hshape, hmaxsize, h_merge_eq⟩ := h_merge
 
+  obtain ⟨hshape_eq, hvshape_eq⟩ := View.cons_shape_eq_cons_shape_iff.mp hshape
+  subst hshape_eq
+  -- subst hvshape_eq -- not possible, because this is an equality of struct attributes
 
+  exists hvshape_eq
+
+  have hmaxsize_tail : v2.max_index ≤ v1.shape.max_index := Nat.le_trans (View.cons_max_index_embed_bound_tail shape stride v2) hmaxsize
+  exists hmaxsize_tail
+
+  /- Idea of the proof: from both sides of h_merge_eq, we need to "take the tail"
+     The left side is the to_index_fn_safe of the cons (use View.cons_to_index_fn_safe_zero_as_index_fn_tail)
+     The right side is v1.compose (cons ...)           (use View.compose_cons_tail)
+  -/
+
+  have h_merge_eq_embed := congrArg (fun f => (f ∘ IndexSet.cons_embed_tail)) h_merge_eq
+  simp at h_merge_eq_embed
+  repeat rw [Function.comp_assoc] at h_merge_eq_embed
+  norm_cast at h_merge_eq_embed
+
+  /- Now we have an annoying cast in the way. We need to get rid of it. -/
+  have := cast_indexset_eq shape stride v2 shape stride' v hshape
+  rw [this] at h_merge_eq_embed
+
+  /- Rewrite the index function -/
+  have h_index_fn_eq := View.cons_to_index_fn_safe_zero_as_index_fn_tail shape stride' v
+  rw [← NatLt.embed_nat_subtype_val_eq_iff] at h_merge_eq_embed
+  conv at h_merge_eq_embed =>
+    /- Very annoying: you need to deal with the associativity of function composition to do the appropriate rewrite...-/
+    lhs
+    repeat rw [Function.comp_assoc]
+    repeat rw [<- Function.comp_assoc]
+    enter [1]
+    repeat rw [Function.comp_assoc]
+    rw [h_index_fn_eq]
+
+  /- Rewrite the compose -/
+  have h_compose_eq := View.compose_cons_tail v1 shape stride v2 hmaxsize
+  rw [<- NatLt.embed_nat_subtype_val_eq_iff] at h_compose_eq
+  rw [h_compose_eq] at h_merge_eq_embed
+
+  /- Now done -/
+  rw [<- NatLt.embed_nat_subtype_val_eq_iff]
+  assumption
 
 
 theorem View.is_merge_cons (v : View)(v1 : View) (shape : PosInt) (stride : PosInt) (v2 : View) :
-  v.is_merge v1 (View.cons shape stride v2) →
-  View.is_merge v1 v2 ∧ View.is_merge v1 (View.from_single_dimension shape stride)
+  (View.cons shape' stride' v).is_merge v1 (View.cons shape stride v2) ↔
+  v.is_merge v1 v2 ∧ (View.from_single_dimension shape' stride').is_merge v1 (View.from_single_dimension shape stride)
   := by
   sorry
 

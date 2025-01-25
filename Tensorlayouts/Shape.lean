@@ -196,6 +196,10 @@ def IndexSet.cons_embed {shapeHead : PosInt} {shapeTail : Shape} :
   IndexSet [shapeHead] → IndexSet (shapeHead :: shapeTail) :=
   fun idx => ⟨idx.val.head (by sorry) :: (IndexSet.zero shapeTail).val, by sorry ⟩
 
+def IndexSet.cons_embed_tail {shapeHead : PosInt} {shapeTail : Shape} :
+  IndexSet shapeTail → IndexSet (shapeHead :: shapeTail) :=
+  fun idx => ⟨ 0 :: idx.val, by sorry ⟩
+
 
 /--
 s : Shape
@@ -458,6 +462,11 @@ theorem View.cons_shape_eq (shape stride : PosInt) (v : View) :
   unfold View.cons
   simp
 
+theorem View.cons_shape_eq_cons_shape_iff {shape shape' : PosInt} {stride stride' : PosInt} {v v2 : View} :
+ (cons shape stride v2).shape = (cons shape' stride' v).shape ↔ shape = shape' ∧ v2.shape = v.shape := by
+  repeat rw [View.cons_shape_eq]
+  apply List.cons_eq_cons
+
 theorem View.cons_stride_eq (shape stride : PosInt) (v : View) :
   (View.cons shape stride v).stride = stride :: v.stride := by
   unfold View.cons
@@ -688,8 +697,6 @@ theorem View.from_single_dimension_index_fn_safe_linear (shape stride : PosInt) 
   simp
   funext idx
   simp
-  unfold NatLt.embed_nat
-  simp
   rw [Nat.mul_comm]
 
 
@@ -717,8 +724,6 @@ theorem View.from_linear_function_shape_eq (f : LinearIntegerFunc) :
 def unravel_unsafe (s : Shape) : Nat -> List Nat :=
   fun idx =>
     List.zipWith (fun shape stride => (idx / stride) % shape) s.toNats (Stride.from_shape s).toNats
-
-#eval unravel_unsafe [⟨3, by simp⟩, ⟨7, by simp⟩, ⟨5, by simp⟩] 43
 
 
 def unravel (s : Shape) : NatLt s.max_index -> IndexSet s :=
