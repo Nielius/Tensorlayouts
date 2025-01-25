@@ -159,27 +159,34 @@ def IndexSet.zero (shape : Shape) : IndexSet shape :=
       exact (shape.get ⟨i, hi_bound⟩).property
   ⟩
 
+-- Can't I do something like this?
+-- theorem List.head!_eq_getElem_zero (l : List α) [Inhabited α] (h: 0 < l.length) : l.head! = l.get ⟨0, h⟩ := by
+
 
 @[simps! apply symm_apply]
 def IndexSet.from_single_dimension_equiv {shape : PosInt} :
   IndexSet [shape] ≃ NatLt shape where
-  toFun x := ⟨x.val.head (fun hempty => by
-    have h : _ := x.property
-    unfold Shape.is_valid_index at h
-    obtain ⟨hlen, hvalid⟩ := h
-    simp at hlen
-    rw [hempty] at hlen
-    simp at hlen
-    ), by
-        have h : _ := x.property
-        unfold Shape.is_valid_index at h
-        obtain ⟨hlen, hvalid⟩ := h
-        have hvalid' := hvalid 0 (by rw [hlen]; simp)
-        simp at hvalid'
-        rw [List.head_eq_getElem_zero]
-        assumption
-     ⟩
-  invFun x := ⟨[x.val], by sorry⟩
+  toFun := Subtype.map
+    (fun x => x.headD 0)
+    (by
+      intro x hvalid
+      unfold Shape.is_valid_index at hvalid
+      obtain ⟨hlen, hvalid⟩ := hvalid
+      have := hvalid 0 (by rw [hlen]; simp)
+      have hx_nonempty : x ≠ [] := by
+        simp at hlen
+        apply List.ne_nil_of_length_pos
+        rw [hlen]
+        simp
+      simp at this
+      simp
+      rw [List.getElem_zero] at this
+      have := List.head?_eq_head hx_nonempty
+      rw [this]
+      simp
+      assumption
+    )
+  invFun := Subtype.map (fun x => [x]) (by sorry)
   left_inv := by sorry
   right_inv := by sorry
 
@@ -187,8 +194,13 @@ def IndexSet.from_single_dimension_equiv {shape : PosInt} :
 def IndexSet.cons_equiv {shapeHead : PosInt} {shapeTail : Shape} :
   IndexSet (shapeHead :: shapeTail) ≃ IndexSet [shapeHead] × IndexSet shapeTail
   where
-  toFun x := ⟨⟨ [x.val.head (by sorry)], by sorry ⟩, ⟨x.val.tail, by sorry ⟩⟩
-  invFun := fun (idxHead, idxTail) => ⟨idxHead.val.head (by sorry) :: idxTail.val, by sorry⟩
+  /- TODO: define this with Subtype.map as well? -/
+  toFun := (Prod.map
+              (Subtype.map (fun idx => [idx.headD 0]) (by sorry))
+              (Subtype.map (fun idx => idx.tail) (by sorry)))
+              ∘ (fun x => (x, x))
+  invFun :=
+     fun (idxHead, idxTail) => ⟨idxHead.val.head (by sorry) :: idxTail.val, by sorry⟩
   left_inv := by sorry
   right_inv := by sorry
 
@@ -522,15 +534,8 @@ theorem View.induction (P : View → Prop)
         exact cons head tail y ys tailLenEq ihP
 
 
-/-- ### Index functions -/
+/- ### Index functions -/
 
-def View.to_index_fn_unsafe (v : View) : List Nat → Option Nat
-  | [] => if v.shape.length = 0 then some 0 else none
-  | idx => if idx.length = v.shape.length then
-            let pairs := List.zip idx v.stride.toNats
-            some (List.foldr (fun (p : Nat × Nat) acc => p.1 * p.2 + acc) 0 pairs)
-          else
-            none
 
 /--
   The smallest strict upper bound for the index that the view can represent.
@@ -637,10 +642,14 @@ theorem View.from_single_dimension_max_index_le : ∀ (shape stride : PosInt),
 --   (View.from_single_dimension shape stride).to_index_fn_unsafe = (fun idx => (shape - 1) * stride + idx) := by
 
 
+def View.to_index_fn_safe_inner (v : View) : List Nat -> Nat :=
+  fun idx => v.stride.toNats.inner_prod idx
 
 def View.to_index_fn_safe (v : View) : (IndexSet v.shape) -> NatLt v.max_index :=
-  fun ⟨idx, idx_bds⟩ => ⟨v.stride.toNats.inner_prod idx, by
-
+  Subtype.map v.to_index_fn_safe_inner (by
+    intro idx hvalid
+    unfold View.to_index_fn_safe_inner
+    simp
     have hasdf : forall (n : Nat), n = v.shape.length -> (v.stride.toNats.inner_prod idx < v.max_index) := by
       -- introducing this is the only way I know of doing induction on n, while keeping the right hypotheses in the goal
       intro n hn
@@ -672,8 +681,7 @@ def View.to_index_fn_safe (v : View) : (IndexSet v.shape) -> NatLt v.max_index :
         sorry --- it is achievable from this point
 
     apply (hasdf v.shape.length (Eq.refl v.shape.length))
- ⟩
-  -- we could add here that the result is always less than the max index
+  )
 
 example : View :=
   View.from_shape [⟨2, by simp⟩, ⟨3, by simp⟩, ⟨54, by simp⟩]
@@ -692,9 +700,18 @@ theorem View.from_single_dimension_index_fn_safe_eq (shape stride : PosInt) :
   rw [<- this]
 
   simp [View.from_single_dimension, View.to_index_fn_safe, List.toNats]
-  rw [List.inner_prod_singleton_left]
+  unfold View.to_index_fn_safe_inner
+  simp [View.from_single_dimension, View.to_index_fn_safe, List.toNats]
+
+  conv =>
+    lhs
+    repeat rw [Subtype.map_comp (x := idx)]
+    simp
+  unfold Subtype.map
   simp
+  rw [List.inner_prod_singleton_left]
   rw [Nat.mul_comm]
+  simp
 
 
 theorem View.from_single_dimension_index_fn_safe_linear (shape stride : PosInt) (hshape : shape.val > 1) :
@@ -730,15 +747,15 @@ theorem View.from_linear_function_shape_eq (f : LinearIntegerFunc) :
 
 /-- ## Unraveling -/
 
-def unravel_unsafe (s : Shape) : Nat -> List Nat :=
+def unravel_inner (s : Shape) : Nat -> List Nat :=
   fun idx =>
     List.zipWith (fun shape stride => (idx / stride) % shape) s.toNats (Stride.from_shape s).toNats
 
 
 def unravel (s : Shape) : NatLt s.max_index -> IndexSet s :=
-  fun idx =>
-    ⟨ unravel_unsafe s idx, by
-      unfold unravel_unsafe
+  Subtype.map (unravel_inner s) (by
+      intro idx hvalid
+      unfold unravel_inner
       unfold Shape.is_valid_index
       simp
 
@@ -759,7 +776,7 @@ def unravel (s : Shape) : NatLt s.max_index -> IndexSet s :=
       rw [hstride]
       apply Nat.mod_lt
       exact s[i].property
-    ⟩
+  )
 
 /--
 Interpretation: the input is a Nat representing an entry in the tensor; the output is the memory index
@@ -780,8 +797,9 @@ theorem unravel_correct : ∀ (s : Shape) (n : NatLt s.max_index),
   have hbnf : (View.from_shape s).to_unraveled_index_fn n = HeterogenousBase.heterogenous_base_bnf s n := by
     unfold View.to_unraveled_index_fn
     unfold unravel
-    unfold unravel_unsafe
+    unfold unravel_inner
     unfold View.to_index_fn_safe
+    unfold View.to_index_fn_safe_inner
     unfold View.from_shape
     unfold HeterogenousBase.heterogenous_base_bnf
     simp
