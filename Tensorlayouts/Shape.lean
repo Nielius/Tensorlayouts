@@ -200,6 +200,14 @@ def IndexSet.cons_embed_tail {shapeHead : PosInt} {shapeTail : Shape} :
   IndexSet shapeTail → IndexSet (shapeHead :: shapeTail) :=
   fun idx => ⟨ 0 :: idx.val, by sorry ⟩
 
+/- Not sure if this is going to be useful without proving many additional theorems
+theorem IndexSet.cons_embed_sum {shapeHead : PosInt} {shapeTail : Shape} :
+  (IndexSet.cons_equiv.symm : IndexSet [shapeHead] × IndexSet shapeTail → IndexSet (shapeHead :: shapeTail))
+  = (IndexSet.cons_embed ∘ Prod.fst) + (IndexSet.cons_embed_tail ∘ Prod.snd) := by
+  simp
+-/
+
+
 
 /--
 s : Shape
@@ -676,16 +684,17 @@ theorem View.from_single_dimension_index_fn_safe_eq (shape stride : PosInt) :
   (fun idx => ⟨ (IndexSet.from_single_dimension_equiv idx).val * stride, by sorry ⟩) := by
   funext idx
 
-  match idx with
-  | ⟨idx_val, idx_bds⟩ =>
-    match idx_val with
-    | [] => sorry -- some contradiction here
-    | idx_val_head :: idx_val_tail =>
-      have idx_val_tail_eq : idx_val_tail = [] := by
-        sorry
+  /- Prove ⟨[(↑idx).head ⋯], ⋯⟩ = idx -/
+  have := (Equiv.left_inv (@IndexSet.from_single_dimension_equiv shape)) idx
+  unfold Function.LeftInverse at this
+  unfold IndexSet.from_single_dimension_equiv at this
+  simp at this
+  rw [<- this]
 
-      simp [View.to_index_fn_safe, List.toNats, List.inner_prod, List.map, List.zipWith]
-      rw [Nat.mul_comm]
+  simp [View.from_single_dimension, View.to_index_fn_safe, List.toNats]
+  rw [List.inner_prod_singleton_left]
+  simp
+  rw [Nat.mul_comm]
 
 
 theorem View.from_single_dimension_index_fn_safe_linear (shape stride : PosInt) (hshape : shape.val > 1) :

@@ -1,4 +1,5 @@
 import Mathlib.Data.List.Basic -- needed for e.g. List.scanr_nil; this is part of simp
+import Mathlib.Algebra.Group.Defs -- for AddMonoid
 
 def Nat.prod (l : List Nat) : Nat :=
   List.foldr (fun x acc => x * acc) 1 l
@@ -17,14 +18,29 @@ def List.inner_prod {α: Type} [Mul α] [Add α] [Zero α] (l : List α) (r : Li
 
 theorem List.inner_prod_nil_nil {α: Type} [Mul α] [Add α] [Zero α] :
    List.inner_prod [] [] = 0 := by
-  simp [List.inner_prod, List.sum_nil, List.zipWith_nil]
-
+  simp [List.inner_prod, List.sum_nil, List.zipWith_nil_right]
 
 theorem List.inner_prod_cons {α: Type} [Mul α] [Add α] [Zero α] (a : α) (l : List α) (b : α) (r : List α) :
    List.inner_prod (a :: l) (b :: r) = a * b + List.inner_prod l r := by
   unfold List.inner_prod
   rw [List.zipWith_cons_cons]
   rw [List.sum_cons]
+
+theorem List.inner_prod_singleton_left {α: Type} [Mul α] [Add α] [Zero α] (a : α) (b : α) (r : List α) :
+   List.inner_prod [a] (b :: r) = a * b + 0 := by
+   simp [List.inner_prod, List.zipWith]
+
+theorem List.inner_prod_cons_as_inner_prods {α: Type} [Mul α] [AddMonoid α] (a : α) (l : List α) (b : α) (r : List α) :
+   List.inner_prod (a :: l) (b :: r) = List.inner_prod [a] [b] + List.inner_prod l r := by
+  unfold List.inner_prod
+  rw [List.zipWith_cons_cons]
+  rw [List.sum_cons]
+  conv =>
+    rhs
+    enter [1]
+    unfold List.zipWith
+    simp
+
 
 
 /-- ## PosInt -/
