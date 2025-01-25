@@ -4,6 +4,7 @@ import Tensorlayouts.Utils
 
 import Mathlib.Data.Set.Basic
 import Mathlib.Logic.Basic
+import Mathlib.Algebra.Group.Nat.Defs
 
 /- ## Definitions of composing and merging views -/
 
@@ -222,6 +223,48 @@ theorem View.cons_to_index_fn_safe_zero_as_index_fn_tail  :
   simp
   norm_cast
 
+/-
+
+In mathematics, I'd just write
+  (cons_shape shape stride v).to_index_fn_safe =
+  (from_single_dimension shape stride).to_index_fn_safe + (v.to_index_fn_safe)
+but you need to take care of the embeddings
+
+-/
+
+theorem View.cons_to_index_fn_safe_decomposition (shape stride : PosInt) (v : View) (x : IndexSet (shape :: v.shape)) :
+  (Subtype.val ∘ ((View.cons shape stride v).to_index_fn_safe)) x =
+  (Subtype.val ∘ (View.from_single_dimension shape stride).to_index_fn_safe ∘ Prod.fst ∘ IndexSet.cons_equiv: IndexSet (shape::v.shape) → Nat) x
+  + (Subtype.val ∘ v.to_index_fn_safe ∘ Prod.snd ∘ IndexSet.cons_equiv : IndexSet (shape::v.shape) → Nat) x
+  := by
+  -- do we need View.cons_shape_eq shape stride v ▸ ?
+
+  /- I want to prove that idx has a head and a tail... -/
+  have := (Equiv.left_inv (@IndexSet.cons_equiv shape v.shape)) x
+  unfold IndexSet.cons_equiv at this
+  dsimp at this
+  rw [<- this]
+
+  /- Now simply unfold and use List.inner_prod_cons_as_inner_prods, but we need to be careful with rewrites -/
+  simp [View.cons, View.to_index_fn_safe, View.from_single_dimension]
+  rw [<- this]
+  simp
+  rw [<- this]
+
+  rw [List.toNats_cons]
+  rw [List.inner_prod_cons_as_inner_prods (α := Nat)]
+  simp [List.toNats]
+
+
+/-
+ ## GEBLEVEN
+
+ - use the above theorem to make the proof of View.compose_cons_head/tail easier?
+ - or: first prove the same thing for composition
+ - then use that to prove the theorem for cons
+
+-/
+
 
 theorem View.compose_cons (v1 : View) (shape stride : PosInt) (v2 : View) (h: (cons shape stride v2).max_index ≤ v1.shape.max_index) :
   NatLt.embed_nat ∘ (v1.compose (cons shape stride v2) h) ∘ IndexSet.cons_embed
@@ -406,11 +449,27 @@ theorem View.cons_is_merge_cons_for_tail :
   assumption
 
 
-theorem View.is_merge_cons (v : View)(v1 : View) (shape : PosInt) (stride : PosInt) (v2 : View) :
+theorem View.cons_is_merge_cons (v : View)(v1 : View) (shape : PosInt) (stride : PosInt) (v2 : View) :
   (View.cons shape' stride' v).is_merge v1 (View.cons shape stride v2) ↔
   v.is_merge v1 v2 ∧ (View.from_single_dimension shape' stride').is_merge v1 (View.from_single_dimension shape stride)
   := by
-  sorry
+  constructor
+
+  . intro h_merge
+    constructor
+    . apply View.cons_is_merge_cons_for_tail
+      assumption
+    . apply View.cons_is_merge_cons_for_head
+      assumption
+
+  . intro h_merge
+    obtain ⟨h_merge_head, h_merge_tail⟩ := h_merge
+
+
+
+    constructor
+    . exact View.cons_is_merge_cons_for_head h_merge
+    . exact View.cons_is_merge_cons_for_tail h_merge
 
 end MergingCons
 
