@@ -81,14 +81,14 @@ abbrev NatLt (n : Nat) : Type := { idx : Nat // idx < n }
 
 @[simp]
 def NatLt.embedding {n m : Nat} (h : n ≤ m) : NatLt n -> NatLt m :=
-  fun x => ⟨x.val, Nat.lt_of_lt_of_le x.property h⟩
+  Subtype.map id (fun _ xprop => Nat.lt_of_lt_of_le xprop h)
 
 def NatLt.embed_nat {n : Nat} : NatLt n -> Nat :=
   fun x => x.val
 
 theorem NatLt.embedding_comp {n m k : Nat} (h1 : k ≤ n) (h2 : m ≤ k) : NatLt.embedding h1 ∘ NatLt.embedding h2 = NatLt.embedding (Nat.le_trans h2 h1) := by
   funext n
-  simp [NatLt.embedding]
+  simp [NatLt.embedding, Subtype.map]
 
 theorem NatLt.embed_nat_comp_embedding {n m : Nat} (h : m ≤ n) : NatLt.embed_nat ∘ NatLt.embedding h = NatLt.embed_nat := by
   funext x
@@ -113,11 +113,15 @@ theorem NatLt.embedding_subtype_val_eq_iff :
     simp [h_eq]
     have := congrFun h_eq x
     simp at this
+    unfold Subtype.map
+    apply Subtype.ext
     assumption
   . intro h_eq
     funext x
     simp [h_eq]
     have := congrFun h_eq x
+    simp at this
+    unfold Subtype.map at this
     simp at this
     assumption
 

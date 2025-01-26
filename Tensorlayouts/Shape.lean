@@ -206,11 +206,11 @@ def IndexSet.cons_equiv {shapeHead : PosInt} {shapeTail : Shape} :
 
 def IndexSet.cons_embed {shapeHead : PosInt} {shapeTail : Shape} :
   IndexSet [shapeHead] → IndexSet (shapeHead :: shapeTail) :=
-  fun idx => ⟨idx.val.head (by sorry) :: (IndexSet.zero shapeTail).val, by sorry ⟩
+  Subtype.map (fun idx => idx.headD 0 :: (IndexSet.zero shapeTail).val) (by sorry)
 
 def IndexSet.cons_embed_tail {shapeHead : PosInt} {shapeTail : Shape} :
   IndexSet shapeTail → IndexSet (shapeHead :: shapeTail) :=
-  fun idx => ⟨ 0 :: idx.val, by sorry ⟩
+  Subtype.map (fun idx => 0 :: idx) (by sorry)
 
 /- Not sure if this is going to be useful without proving many additional theorems
 theorem IndexSet.cons_embed_sum {shapeHead : PosInt} {shapeTail : Shape} :
@@ -645,6 +645,10 @@ theorem View.from_single_dimension_max_index_le : ∀ (shape stride : PosInt),
 def View.to_index_fn_safe_inner (v : View) : List Nat -> Nat :=
   fun idx => v.stride.toNats.inner_prod idx
 
+theorem View.to_index_fn_safe_inner_additive (v : View) (l l' : List Nat) :
+  v.to_index_fn_safe_inner (List.zipWith (fun x y => x + y) l l') = v.to_index_fn_safe_inner l + v.to_index_fn_safe_inner l' := by
+  sorry
+
 def View.to_index_fn_safe (v : View) : (IndexSet v.shape) -> NatLt v.max_index :=
   Subtype.map v.to_index_fn_safe_inner (by
     intro idx hvalid
@@ -790,10 +794,8 @@ unravel is the inverse of the index function for the default view for a shape
 We could make this a bit more general: if we extend unravel to all of Nat,
 then this is also true for any n : Nat.
 -/
-theorem unravel_correct : ∀ (s : Shape) (n : NatLt s.max_index),
+theorem unravel_correct {s : Shape} (n : NatLt s.max_index) :
   (View.from_shape s).to_unraveled_index_fn n = (n : Nat) % s.max_index := by
-  intro s n
-
   have hbnf : (View.from_shape s).to_unraveled_index_fn n = HeterogenousBase.heterogenous_base_bnf s n := by
     unfold View.to_unraveled_index_fn
     unfold unravel
@@ -843,48 +845,36 @@ theorem unravel_correct_fn (s: Shape):
   exact n.property
 
 theorem unravel_correct_fn' (s: Shape):
-  exists hsametype: NatLt (View.from_shape s).shape.max_index = NatLt (View.from_shape s).max_index,
-     (View.from_shape s).to_unraveled_index_fn = (cast hsametype) := by
-
-  have hsametype: NatLt (View.from_shape s).shape.max_index = NatLt (View.from_shape s).max_index := by
+  let (hsame_type : (View.from_shape s).shape.max_index = (View.from_shape s).max_index) := by
     rw [View.max_index_from_shape]
     rw [View.from_shape_shape_eq]
-  exists hsametype
-
+  (View.from_shape s).to_unraveled_index_fn = (Subtype.map id (fun x h => hsame_type ▸ h): NatLt (View.from_shape s).shape.max_index → NatLt (View.from_shape s).max_index) := by
+  -- (fun x => ⟨ x.val, hsame_type ▸ x.prop⟩ : NatLt (View.from_shape s).shape.max_index → NatLt (View.from_shape s).max_index) := by
+  -- (cast (congrArg NatLt hsame_type)) := by
+  simp
   funext n
-  have hcorrect : _ := unravel_correct_fn s
+  apply Subtype.ext
+  have hshape_eq  := View.from_shape_shape_eq s
+  have := unravel_correct n
 
-  cases hcorrect with
-  | intro htype_input hrest =>
-    cases hrest with
-    | intro htype_output hcorrect_fn =>
-      have hcorrect_fn_n : _ := congrFun hcorrect_fn n
-      simp at hcorrect_fn_n
-      conv =>
-        rhs
-        rw [<- hcorrect_fn_n]
+  /- Again, super annoying dependent rewrite that Lean doesn't find itself... -/
+  have h_cast : ((View.from_shape (View.from_shape s).shape).to_unraveled_index_fn n)
+              = ((View.from_shape s).to_unraveled_index_fn n) := by
+    -- Use the hypothesis `hshape_eq` to simplify the left-hand side of the equation
+    have := @Eq.rec _ _
+      (motive := fun x (h : s = x) ↦
+         (View.from_shape x).to_unraveled_index_fn (h ▸ n) = h ▸ (View.from_shape s).to_unraveled_index_fn n)
+      (by rfl)
+      (View.from_shape s).shape hshape_eq.symm
+    simp at this
+    assumption
 
-      simp
+  rw [<- h_cast]
+  rw [this]
 
-
-theorem unravel_correct_fn'' (s: Shape):
-  exists hsametype: (View.from_shape s).shape.max_index = (View.from_shape s).max_index,
-     (View.from_shape s).to_unraveled_index_fn = hsametype ▸ id := by
-  have hsametype: (View.from_shape s).shape.max_index = (View.from_shape s).max_index := by
-    rw [View.max_index_from_shape]
-    rw [View.from_shape_shape_eq]
-  exists hsametype
-
-  funext n
-  have hcorrect : _ := unravel_correct s n
-  have hshape: (View.from_shape s).shape = s := by
-    rw [View.from_shape_shape_eq]
-  have hn_modulo_bound : ↑n % s.max_index = ↑n := by
-    apply Nat.mod_eq_of_lt n.property
-  rw [hn_modulo_bound] at hcorrect
-
-  apply id_casting_lemma
-  assumption
+  have : ↑n % (View.from_shape s).shape.max_index = (n : Nat) := Nat.mod_eq_of_lt n.property
+  rw [this]
+  simp
 
 
 theorem unravel_correct' (s : Shape) :

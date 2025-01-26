@@ -41,62 +41,22 @@ theorem test_with_struct (f: Nat -> Nat) (x y : MyPair) (h : x.n = y.n) (hx : f 
   -- subst h -- still doesn't work
   rw [h] -- now I can use rewrite, because there is no proof aspect anymore
 
-#print test_with_struct
+
+section DependentRewrite
+
+variable {Shape: Type}
+variable {N : Shape -> Type}
 
 
-theorem test'' (p1 : MyPair) (h1 h2 : p1.n = (0: Nat)) : F p1.n h1 = F p1.n h2 := by
-  have h_rewrite : F p1.n h1 = F 0 (Eq.refl 0) := by
-    apply congrArg2 F
-    exact h1
-    exact Eq.refl 0
-  have h_rewrite' : F p1.n h2 = F 0 (Eq.refl 0) := by
-    apply congrArg2 F
-    exact h2
-    exact Eq.refl 0
-  rw [h_rewrite, h_rewrite']
+variable (s s' : Shape)
+variable (f : ∀ (s: Shape), N s → Nat)
+
+theorem dependent_rewrite_works (h : s = s') (x : N s) : f s x = f s' (cast (congrArg N h) x) := by
+  subst h
   rfl
 
-#print test
+#print dependent_rewrite_works
 
+#check @Eq.rec Shape s (fun s' h ↦ f s x = f s' (cast (congrArg N h) x)) (Eq.refl (f s x)) s' h : f s x = f s' (cast ⋯ x)
 
-
-example (n : Nat) (h1 h2 : n = 0) : F n h1 = F n h2 := by
-  rewrite [h1]  -- This should give "motive is dependent"
-
-
-def MyVec (n : Nat) := { xs : List Nat // xs.length = n }
-
-example (n m : Nat) (h : n = m) (v : MyVec n) : MyVec m := by
-  rewrite [h]  -- This should fail with "motive is dependent"
-
-
-
-def MyType (n : Nat) := Array.mk (List.range n)
-
-example (n m : Nat) (h : n = m) (v : MyType n) : MyType m := by
-  rewrite [h]  -- Fails with "motive is dependent"
-
-
-
-
-def P (n : Nat) := Vec Nat n  -- P depends on n
-
-example (n m : Nat) (h : n = m) (v : P n) : P m := by
-  rewrite [h]  -- This fails with "motive is dependent"
-
-
-def NT := { n : Nat // n > 0 }
-example (n m : NT) (h: n = m) : n = m := by
-  rewrite [h]
-
-
-
-
-
-
-def P (n : Nat) := n = 2
-
-
-
-example (n : Nat) (h : n = 2) : P n := by
-  rewrite [h]  -- Fails with "motive is dependent"
+end DependentRewrite
