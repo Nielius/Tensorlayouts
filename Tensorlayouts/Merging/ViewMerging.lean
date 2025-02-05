@@ -1,61 +1,12 @@
 import Tensorlayouts.Shape
 import Tensorlayouts.ExperimentFunCast
+import Tensorlayouts.Merging.Definitions
 import Tensorlayouts.Utils
 
 import Mathlib.Data.Set.Basic
 import Mathlib.Logic.Basic
 import Mathlib.Algebra.Group.Nat.Defs
 
-/- ## Definitions of composing and merging views -/
-
-def View.compose (v1: View) (v2: View) (h: v2.max_index ≤ v1.shape.max_index) : IndexSet v2.shape -> NatLt v1.max_index :=
-  v1.to_unraveled_index_fn ∘ NatLt.embedding h ∘ v2.to_index_fn_safe
-
-
-/--
-  Expresses whether v is a merge of v1 and v2
--/
-def View.is_merge (v: View) (v1 : View) (v2 : View) : Prop :=
-  exists (hshape: v2.shape = v.shape)
-         (hmaxsize : v2.max_index ≤ v1.shape.max_index),
-  let hshape_fn :  (IndexSet v2.shape → NatLt v2.max_index) = (IndexSet v.shape → NatLt v2.max_index) := by congr
-    NatLt.embed_nat ∘ (hshape ▸ v.to_index_fn_safe)
-  = NatLt.embed_nat ∘ (View.compose v1 v2 hmaxsize)
-  -- = NatLt.embed_nat ∘ v1.to_unraveled_index_fn ∘ NatLt.embedding hmaxsize ∘ (cast hshape_fn v2.to_index_fn_safe)
-
-
-def View.is_mergeable  (v1 : View) (v2 : View) : Prop :=
-  ∃(v: View), v.is_merge v1 v2
-
-
-theorem View.is_merge__helper (v2 v : View) (hshape : v2.shape = v.shape) :
-  (hshape ▸ v.to_index_fn_safe) =  v.to_index_fn_safe ∘ (cast (congrArg IndexSet hshape)) := by
-  sorry
-
-
-theorem View.is_merge_cast_formulation (v: View) (v1 : View) (v2 : View)  :
-  v.is_merge v1 v2 ↔
-  exists (hshape: v2.shape = v.shape)
-         (hmaxsize : v2.max_index ≤ v1.shape.max_index),
-  let hshape_fn :  (IndexSet v2.shape → NatLt v2.max_index) = (IndexSet v.shape → NatLt v2.max_index) := by congr
-    NatLt.embed_nat ∘ v.to_index_fn_safe ∘ (cast (congrArg IndexSet hshape))
-  = NatLt.embed_nat ∘ (View.compose v1 v2 hmaxsize) := by
-  constructor
-
-  /- there is probably a better way to do this; it's basically a rewrite with View.is_merge__helper -/
-  intro h_merge
-  obtain ⟨hshape, hmaxsize, h_merge_eq⟩ := h_merge
-  exists hshape
-  exists hmaxsize
-  rw [<- View.is_merge__helper v2 v hshape]
-  assumption
-
-  intro h_merge
-  obtain ⟨hshape, hmaxsize, h_merge_eq⟩ := h_merge
-  exists hshape
-  exists hmaxsize
-  rw [View.is_merge__helper v2 v hshape]
-  assumption
 
 
 theorem cast_indexset_eq__helper (s s' :Shape) (h : s = s') (x : IndexSet s) : x.val = (cast (congrArg IndexSet h) x).val := by
@@ -63,11 +14,10 @@ theorem cast_indexset_eq__helper (s s' :Shape) (h : s = s') (x : IndexSet s) : x
   simp
 
 
-
 theorem cast_indexset_eq (shape stride : PosInt) (v : View) (shape' stride' : PosInt) (v' : View)
   (h : (View.cons shape stride v).shape = (View.cons shape' stride' v').shape) :
   (cast (congrArg IndexSet h)) ∘ IndexSet.cons_embed_tail =
-  IndexSet.cons_embed_tail ∘     (cast (congrArg IndexSet ((View.cons_shape_eq_cons_shape_iff (v := v') (v2 := v)).mp h).right)) := by
+  IndexSet.cons_embed_tail ∘ (cast (congrArg IndexSet ((View.cons_shape_eq_cons_shape_iff (v := v') (v2 := v)).mp h).right)) := by
   /- afaict, the only reason this is so difficult, is that subst does not work well with structure fields! -/
   funext x
   simp [IndexSet.cons_embed_tail]

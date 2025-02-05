@@ -37,8 +37,7 @@ theorem test_with_struct (f: Nat -> Nat) (x y : MyPair) (h : x.n = y.n) (hx : f 
   (⟨ f x.n , hx ⟩ : PosInt) = (⟨ f y.n , hy ⟩ : PosInt) := by
   -- rw [h] -- doesn't work! motive type is not correct
   -- subst h -- doesn't work! invalid equality proof (this is the new problem in the struct case)
-  simp -- this somehow removes the proof parts! don't know why this works though... maybe something like Subtype.ext?
-  -- subst h -- still doesn't work
+  rw [Subtype.mk.injEq] -- this removes the proof parts! and therefore, we can use rewrite. But this approach is not always possible.
   rw [h] -- now I can use rewrite, because there is no proof aspect anymore
 
 
