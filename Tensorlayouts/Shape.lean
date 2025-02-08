@@ -5,6 +5,7 @@ import Tensorlayouts.LinearIntegerFunc
 import Mathlib.Data.List.Basic -- needed for e.g. List.scanr_nil; this is part of simp
 import Mathlib.Data.List.Zip -- needed for List.zipWith_map_right
 import Mathlib.Logic.Equiv.Basic
+import Mathlib.Data.List.OfFn
 
 /- ## Shape and Stride -/
 
@@ -235,3 +236,45 @@ theorem Shape.max_index_tail_increase : ∀ (s : Shape) (s' : PosInt),
   have h : (s' : Nat) > 0 := by
     exact s'.property
   exact Nat.le_mul_of_pos_left s.max_index h
+
+
+/- ## IndexSet as functions: experimental -/
+
+
+def IndexFnSet (s : Shape) : Type :=
+  { f : Fin s.length → Nat // ∀ i, f i < s.get ⟨i, by simp⟩ }
+
+
+@[simps! apply symm_apply]
+def IndexSet.fn_equiv {shape : Shape} :
+  IndexSet shape ≃ IndexFnSet shape :=
+  { toFun x := ⟨fun i => x.val[i]' (by
+      -- have h_idx := x.property
+      -- unfold Shape.is_valid_index at h_idx
+      obtain ⟨hlen, h_idx⟩ := x.property
+      rw [hlen]
+      exact i.is_lt
+      ),
+      by
+      obtain ⟨hlen, h_idx⟩ := x.property
+      intro i
+      apply h_idx
+    ⟩,
+    invFun f := ⟨List.ofFn f.val, by
+      unfold Shape.is_valid_index
+      have : (List.ofFn f.val).length = List.length shape := by simp
+      exists this
+      intro i hi
+
+      rw [List.get_ofFn]
+      apply f.property
+     ⟩
+    left_inv := by sorry,
+    right_inv := by sorry }
+
+def incrementIndex {s : Shape} (i : IndexFnSet s) (j : Fin s.length) (h : i.val j + 1 < s.get j) : IndexFnSet s :=
+  ⟨fun k => if k = j then i.val k + 1 else i.val k, by
+    intro k
+    by_cases hkj : k = j
+    · rw [hkj]; simp; exact h
+    · simp; rw [if_neg hkj]; exact i.property k⟩

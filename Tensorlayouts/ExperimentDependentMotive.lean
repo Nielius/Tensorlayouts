@@ -18,6 +18,21 @@ theorem test' (p1 : MyPair) (h1 h2 : p1.n = (0: Nat)) : F p1.n h1 = F p1.n h2 :=
   -- subst h1 -- doesn't work
   -- rw [h1] -- doesn't work
 
+  cases p1
+  rename_i n m
+  | mk n m =>
+    simp
+
+
+  cases p1 with
+  | mk n m =>
+    simp
+
+
+
+
+
+
   -- working proof (but it does something else!):
   have h_eq : h1 = h2 := by
     apply proof_irrel  -- Proofs of equalities in `Prop` are always equal

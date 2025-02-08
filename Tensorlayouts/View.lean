@@ -246,7 +246,7 @@ theorem View.from_single_dimension_max_index_le : ∀ (shape stride : PosInt),
 
 
 def View.to_index_fn_safe_inner (v : View) : List Nat -> Nat :=
-  fun idx => v.stride.toNats.inner_prod idx
+  v.stride.toNats.inner_prod
 
 theorem View.to_index_fn_safe_inner_additive (v : View) (l l' : List Nat) :
   v.to_index_fn_safe_inner (List.zipWith (fun x y => x + y) l l') = v.to_index_fn_safe_inner l + v.to_index_fn_safe_inner l' := by
@@ -373,10 +373,10 @@ def unravel (s : Shape) : NatLt s.max_index -> IndexSet s :=
           unfold Stride.from_shape
           rw [List.scanr_length_tail]
         rw [hlenstride]
-        simp
       exists hlen
 
       intros i hbound
+      rw [<- Nat.lt_min] at hbound
       rewrite [hlen] at hbound
       have hstride : (List.toNats s)[i] = (s)[i] := by
         exact List.toNats_getElem s i hbound

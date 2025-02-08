@@ -74,6 +74,15 @@ theorem PosInt.mul_comm (a b : PosInt) : a * b = b * a := by
    simp [h]
 instance : Std.Commutative (α := PosInt) (· * ·) := ⟨PosInt.mul_comm⟩
 
+-- Order instances
+instance : LT PosInt := ⟨λ a b => a.val < b.val⟩
+instance : LE PosInt := ⟨λ a b => a.val ≤ b.val⟩
+instance : DecidableRel (· < · : PosInt → PosInt → Prop) := inferInstance
+instance : DecidableRel (· ≤ · : PosInt → PosInt → Prop) := inferInstance
+
+instance : ToString PosInt where
+  toString a := toString a.val
+
 
 /-- ## NatLT -/
 
