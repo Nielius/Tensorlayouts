@@ -14,3 +14,5 @@
 - use `Fin` from `Mathlib.Data.Fin.Basic` instead of `NatLt`; it is basically the same
 - maybe use `Fin n \to Nat` for indices, rather than lists
 - coerce or `List.unnatach` instead of `.toNats`?
+
+- how should you use the equivalence? should you use `.toFun` and `.invFun`? I think you probably shouldn't, but sometimes `simp` produces it, and then it's difficult to get rid of, making rewrites that don't involve `.toFun`/`.invFun` difficult

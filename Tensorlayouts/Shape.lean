@@ -160,6 +160,17 @@ def IndexSet.zero (shape : Shape) : IndexSet shape :=
       exact (shape.get ⟨i, hi_bound⟩).property
   ⟩
 
+@[simp]
+theorem IndexSet.zero_length (shape : Shape) : (IndexSet.zero shape).val.length = shape.length := by
+  unfold IndexSet.zero
+  simp only [List.map_const', List.length_replicate]
+
+@[simp]
+theorem IndexSet.zero_getElem_zero {shape : Shape } :
+  ∀ (i : Fin shape.length), (IndexSet.zero shape).val[i] = 0 := by
+  unfold IndexSet.zero
+  simp
+
 -- Can't I do something like this?
 -- theorem List.head!_eq_getElem_zero (l : List α) [Inhabited α] (h: 0 < l.length) : l.head! = l.get ⟨0, h⟩ := by
 
@@ -277,3 +288,27 @@ def incrementIndex {s : Shape} (i : IndexFnSet s) (j : Fin s.length) (h : i.val 
     by_cases hkj : k = j
     · rw [hkj]; simp; exact h
     · simp; rw [if_neg hkj]; exact i.property k⟩
+
+def IndexFnSet.zero (s : Shape) : IndexFnSet s :=
+  ⟨fun _ => 0, by
+    intro i
+    simp
+    exact (s.get i).property
+ ⟩
+
+theorem IndexFnSet.zero_equiv {s : Shape} : IndexFnSet.zero s = IndexSet.fn_equiv (IndexSet.zero s) := by
+  simp
+  unfold IndexFnSet.zero
+  apply Subtype.ext
+  simp
+  funext i
+  symm
+  apply IndexSet.zero_getElem_zero
+
+
+theorem IndexFnSet.induction {s : Shape} (P : IndexFnSet s → Prop)
+  (h0 : P (IndexSet.fn_equiv.toFun (IndexSet.zero s)))
+  (step : ∀ (i : IndexFnSet s) (j : Fin s.length) (h : i.val j + 1 < s.get j), P i → P (incrementIndex i j h)) :
+  ∀ (i : IndexFnSet s), P i := by
+  intro i
+  sorry

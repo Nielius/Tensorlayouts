@@ -62,13 +62,6 @@ theorem View.is_mergeable_left_canonical (s : Shape) (v2 : View) (hmaxsize : v2.
 /- ## Straight at the target -/
 
 
-theorem single_view_is_linear (v: View) (i : IndexFnSet v.shape) (j : Fin v.shape.length) (h : i.val j + 1 < v.shape.get j) :
-    (v.to_index_fn_safe (IndexSet.fn_equiv.symm (incrementIndex i j h))).val
-  - (v.to_index_fn_safe (IndexSet.fn_equiv.symm i)).val
-  = (v.to_index_fn_safe (IndexSet.fn_equiv.symm (incrementIndex (IndexSet.zero v.shape).fn_equiv j (by sorry)))).val := by
-  sorry
-
-
 theorem compose_is_linear_if_mergeable
   (v1 v2: View) (h_maxsize : v2.max_index ≤ v1.shape.max_index)
   (h_merge : View.is_mergeable v1 v2)
@@ -101,7 +94,7 @@ theorem compose_is_linear_if_mergeable
     simp at hshape
     subst hshape
 
-    have := single_view_is_linear { shape := v2.shape, stride := vstride, lengthEq := vlengthEq } i j (by sorry)
+    have := View.index_fn_is_linear { shape := v2.shape, stride := vstride, lengthEq := vlengthEq } i j (by sorry)
     simp at this
     simp
     rw [<- this]
@@ -133,7 +126,7 @@ theorem mergeability_criterion (v1 v2: View) :
       -- Include this if we want offsets  - ((v1.compose v2 h_maxsize) (IndexSet.fn_equiv.symm i_zero_fn)).val
     else 0
 
-  swap -- fill in the hole
+  swap -- fill in the hole first
   simp [i_zero_fn, IndexSet.fn_equiv, i_zero, IndexSet.zero]
   exact h.gt
 
@@ -164,10 +157,70 @@ theorem mergeability_criterion (v1 v2: View) :
   obtain ⟨h_composable, stride, h_stride_eq⟩ := h_increment_criterion
 
   let stride_as_list := List.ofFn stride
-  let v : View := { shape := v2.shape, stride := stride_as_list, lengthEq := v2.lengthEq }
+  have v_lengthEq : v2.shape.length = List.length stride_as_list := by sorry
+  let v : View := { shape := v2.shape, stride := stride_as_list, lengthEq := v_lengthEq }
+  exists v
+
+  unfold View.is_merge
+  have hshape : v2.shape = v.shape := by unfold v; simp
+  exists hshape
+  exists h_composable
+
+
+  simp
+
+  have h_eq_on_fn :
+    ∀ (i : IndexFnSet v2.shape),
+    (NatLt.embed_nat ∘ Eq.rec (motive := fun x h ↦ IndexSet x → NatLt v.max_index)
+       v.index_fn (View.is_merge.proof_2 v v2 hshape)) (IndexSet.fn_equiv.invFun i) =
+    (NatLt.embed_nat ∘ v1.compose v2 h_composable) (IndexSet.fn_equiv.invFun i) :=
+    by
+      apply IndexFnSet.induction
+      . have := IndexSet.fn_equiv.left_inv (x := (IndexSet.zero v2.shape))
+        rw [this]
+        simp
+        sorry -- create two lemmas: (1) v.index_fn (IndexSet.zero v2.shape) = 0; (2) v1.compose v2 h_composable (IndexSet.zero v2.shape) = 0
+      . intro i j h_j
+        simp
+        rw [h_stride_eq]
+        simp
+        rw [h_stride_eq]
+        simp
 
 
 
+        unfold IndexSet.fn_equiv.toFun
+
+
+
+
+        rw [<- IndexFnSet.zero_equiv]
+
+        simp
+        rw [IndexSet.zero_getElem_zero]
+        simp
+
+
+
+
+        rw [IndexSet.zero_getElem_zero]
+        simp [IndexSet.zero_getElem_zero]
+
+
+
+
+  funext i
+  simp
+
+  let i_as_fn : IndexFnSet v2.shape := IndexSet.fn_equiv i
+  have h_i_as_fn : i = IndexSet.fn_equiv.invFun i_as_fn := by
+    have := IndexSet.fn_equiv.left_inv (α := IndexSet v2.shape)
+    unfold Function.LeftInverse at this
+    have := (this i).symm
+    exact this
+  rw [h_i_as_fn]
+
+  apply h_eq_on_fn
 
 
 /- ## Lemmas about indices -/
@@ -475,15 +528,15 @@ theorem View.is_mergeable_single_dimension_right (v1: View) (shape : PosInt) (st
 
 
 
-      simp [View.from_single_dimension, View.to_index_fn_safe, View.to_unraveled_index_fn] at h_merge_eq_i
-      simp [View.to_index_fn_safe, List.toNats, List.inner_prod, List.map, List.zipWith] at h_merge_eq_i
+      simp [View.from_single_dimension, View.index_fn, View.to_unraveled_index_fn] at h_merge_eq_i
+      simp [View.index_fn, List.toNats, List.inner_prod, List.map, List.zipWith] at h_merge_eq_i
 
-      have h_index_fn_eq : v.to_index_fn_safe =
-        cast (by rw [hv_eq]) (from_single_dimension vshape vstride).to_index_fn_safe := by
+      have h_index_fn_eq : v.index_fn =
+        cast (by rw [hv_eq]) (from_single_dimension vshape vstride).index_fn := by
         rw [hv_eq]
 
-      have h_compose_eq : NatLt.embed_nat ∘ v.to_index_fn_safe =
-        NatLt.embed_nat ∘ (cast (by rw [hv_eq]) (from_single_dimension vshape vstride).to_index_fn_safe) := by
+      have h_compose_eq : NatLt.embed_nat ∘ v.index_fn =
+        NatLt.embed_nat ∘ (cast (by rw [hv_eq]) (from_single_dimension vshape vstride).index_fn) := by
         congr
         exact h_index_fn_eq
 

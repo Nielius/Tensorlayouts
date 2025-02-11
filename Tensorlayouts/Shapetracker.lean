@@ -19,7 +19,7 @@ def ShapeTracker.to_index_fn (st: ShapeTracker) : List Nat -> Nat :=
     List.foldr (fun (p : Nat × Nat) acc => p.1 * p.2 + acc) 0 pairs
 
 
-def ShapeTracker.to_index_fn_safe (st: ShapeTracker) : IndexSet st.views.getLastD.shape -> Nat :=
+def ShapeTracker.index_fn (st: ShapeTracker) : IndexSet st.views.getLastD.shape -> Nat :=
   fun ⟨idx, _⟩ =>
   let pairs := List.zip idx st.views.map View.stride
   List.foldr (fun (p : Nat × Nat) acc => p.1 * p.2 + acc) 0 pairs

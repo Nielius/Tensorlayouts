@@ -72,6 +72,10 @@ theorem View.from_single_dimension_stride_eq (shape : PosInt) (stride : Nat) :
   unfold View.from_single_dimension
   simp
 
+theorem View.len_1_from_single_dimension (v: View) (hlen: v.shape.length = 1) :
+  ∃ (shape stride : PosInt), v = View.from_single_dimension shape stride := by
+  sorry
+
 def View.nil : View := {
   shape := [],
   stride := [],
@@ -252,17 +256,19 @@ theorem View.from_single_dimension_max_index_le : ∀ (shape stride : PosInt),
 --   (View.from_single_dimension shape stride).to_index_fn_unsafe = (fun idx => (shape - 1) * stride + idx) := by
 
 
-def View.to_index_fn_safe_inner (v : View) : List Nat -> Nat :=
+/- ### Index functions for views -/
+
+def View.index_fn_inner (v : View) : List Nat -> Nat :=
   v.stride.inner_prod
 
-theorem View.to_index_fn_safe_inner_additive (v : View) (l l' : List Nat) :
-  v.to_index_fn_safe_inner (List.zipWith (fun x y => x + y) l l') = v.to_index_fn_safe_inner l + v.to_index_fn_safe_inner l' := by
+theorem View.index_fn_inner_additive (v : View) (l l' : List Nat) :
+  v.index_fn_inner (List.zipWith (fun x y => x + y) l l') = v.index_fn_inner l + v.index_fn_inner l' := by
   sorry
 
-def View.to_index_fn_safe (v : View) : (IndexSet v.shape) -> NatLt v.max_index :=
-  Subtype.map v.to_index_fn_safe_inner (by
+def View.index_fn (v : View) : (IndexSet v.shape) -> NatLt v.max_index :=
+  Subtype.map v.index_fn_inner (by
     intro idx hvalid
-    unfold View.to_index_fn_safe_inner
+    unfold View.index_fn_inner
     simp
     have hasdf : forall (n : Nat), n = v.shape.length -> (v.stride.inner_prod idx < v.max_index) := by
       -- introducing this is the only way I know of doing induction on n, while keeping the right hypotheses in the goal
@@ -302,7 +308,7 @@ example : View :=
 
 
 theorem View.from_single_dimension_index_fn_safe_eq (shape stride : PosInt) :
-  (View.from_single_dimension shape stride).to_index_fn_safe =
+  (View.from_single_dimension shape stride).index_fn =
   (fun idx => ⟨ (IndexSet.from_single_dimension_equiv idx).val * stride, by sorry ⟩) := by
   funext idx
 
@@ -313,9 +319,9 @@ theorem View.from_single_dimension_index_fn_safe_eq (shape stride : PosInt) :
   simp at this
   rw [<- this]
 
-  simp [View.from_single_dimension, View.to_index_fn_safe]
-  unfold View.to_index_fn_safe_inner
-  simp [View.from_single_dimension, View.to_index_fn_safe]
+  simp [View.from_single_dimension, View.index_fn]
+  unfold View.index_fn_inner
+  simp [View.from_single_dimension, View.index_fn]
 
   conv =>
     lhs
@@ -329,7 +335,7 @@ theorem View.from_single_dimension_index_fn_safe_eq (shape stride : PosInt) :
 
 
 theorem View.from_single_dimension_index_fn_safe_linear (shape stride : PosInt) (hshape : shape.val > 1) :
-  NatLt.embed_nat ∘ (View.from_single_dimension shape stride).to_index_fn_safe =
+  NatLt.embed_nat ∘ (View.from_single_dimension shape stride).index_fn =
   ({ slope := stride, max_val := ⟨ shape.val, hshape ⟩ } : LinearIntegerFunc).fun ∘ IndexSet.from_single_dimension_equiv  := by
 
   rw [View.from_single_dimension_index_fn_safe_eq]
@@ -340,15 +346,20 @@ theorem View.from_single_dimension_index_fn_safe_linear (shape stride : PosInt) 
   rw [Nat.mul_comm]
 
 
-theorem View.len_1_from_single_dimension (v: View) (hlen: v.shape.length = 1) :
-  ∃ (shape stride : PosInt), v = View.from_single_dimension shape stride := by
+theorem View.index_fn_is_linear (v: View) (i : IndexFnSet v.shape) (j : Fin v.shape.length) (h : i.val j + 1 < v.shape.get j) :
+    (v.index_fn (IndexSet.fn_equiv.symm (incrementIndex i j h))).val
+  - (v.index_fn (IndexSet.fn_equiv.symm i)).val
+  = (v.index_fn (IndexSet.fn_equiv.symm (incrementIndex (IndexSet.zero v.shape).fn_equiv j (by sorry)))).val := by
   sorry
+
+
+/- ### Views from linear functions -/
 
 def View.from_linear_function (f : LinearIntegerFunc) : View :=
   View.from_single_dimension ⟨f.max_val, by sorry ⟩ f.slope
 
 theorem View_from_linear_function_to_linear_function (f : LinearIntegerFunc) :
-  NatLt.embed_nat ∘ (View.from_linear_function f).to_index_fn_safe = f.fun ∘ IndexSet.from_single_dimension_equiv := by
+  NatLt.embed_nat ∘ (View.from_linear_function f).index_fn = f.fun ∘ IndexSet.from_single_dimension_equiv := by
   sorry
 
 theorem View.from_linear_function_shape_eq (f : LinearIntegerFunc) :
@@ -356,6 +367,10 @@ theorem View.from_linear_function_shape_eq (f : LinearIntegerFunc) :
   unfold View.from_linear_function
   unfold View.from_single_dimension
   simp
+
+
+
+
 
 
 
@@ -390,7 +405,7 @@ def unravel (s : Shape) : NatLt s.max_index -> IndexSet s :=
 Interpretation: the input is a Nat representing an entry in the tensor; the output is the memory index
 -/
 def View.to_unraveled_index_fn (v : View) : NatLt v.shape.max_index -> NatLt v.max_index :=
-  v.to_index_fn_safe ∘ unravel v.shape
+  v.index_fn ∘ unravel v.shape
 
 /--
 unravel is the inverse of the index function for the default view for a shape
@@ -404,8 +419,8 @@ theorem unravel_correct {s : Shape} (n : NatLt s.max_index) :
     unfold View.to_unraveled_index_fn
     unfold unravel
     unfold unravel_inner
-    unfold View.to_index_fn_safe
-    unfold View.to_index_fn_safe_inner
+    unfold View.index_fn
+    unfold View.index_fn_inner
     unfold View.from_shape
     unfold HeterogenousBase.heterogenous_base_bnf
     simp

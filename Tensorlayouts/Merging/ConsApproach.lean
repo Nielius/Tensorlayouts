@@ -25,13 +25,13 @@ theorem List.headD_eq (l : List α) (h : l ≠ []) (d: α) : l.headD d = l.head 
   apply List.head?_getD_eq
 
 theorem View.cons_to_index_fn_safe_zero (x : IndexSet [shape]) :
-  NatLt.embed_nat ((View.cons shape stride v2).to_index_fn_safe (IndexSet.cons_embed x)) = x.val.head (by sorry) * stride
+  NatLt.embed_nat ((View.cons shape stride v2).index_fn (IndexSet.cons_embed x)) = x.val.head (by sorry) * stride
   := by
-  unfold View.to_index_fn_safe
+  unfold View.index_fn
   unfold IndexSet.cons_embed
 
 
-  simp [View.cons, View.to_index_fn_safe, View.to_index_fn_safe_inner, List.toNats, List.inner_prod, IndexSet.cons_embed, IndexSet.zero]
+  simp [View.cons, View.index_fn, View.index_fn_inner, List.toNats, List.inner_prod, IndexSet.cons_embed, IndexSet.zero]
   conv =>
     lhs
     arg 2
@@ -64,8 +64,8 @@ theorem View.cons_to_index_fn_safe_zero (x : IndexSet [shape]) :
 
 
 theorem View.cons_to_index_fn_safe_zero_as_index_fn  :
-  NatLt.embed_nat ∘ (View.cons shape stride v2).to_index_fn_safe ∘ IndexSet.cons_embed =
-  NatLt.embed_nat ∘ (View.from_single_dimension shape stride).to_index_fn_safe
+  NatLt.embed_nat ∘ (View.cons shape stride v2).index_fn ∘ IndexSet.cons_embed =
+  NatLt.embed_nat ∘ (View.from_single_dimension shape stride).index_fn
   := by
   funext x
   have := View.cons_to_index_fn_safe_zero shape stride v2 x
@@ -78,8 +78,8 @@ theorem View.cons_to_index_fn_safe_zero_as_index_fn  :
 
 
 theorem View.cons_to_index_fn_safe_zero_as_index_fn' (x : IndexSet [shape]) :
-  ((View.cons shape stride v2).to_index_fn_safe ∘ IndexSet.cons_embed) x =
-  ((View.from_single_dimension shape stride).to_index_fn_safe x : Nat) := by
+  ((View.cons shape stride v2).index_fn ∘ IndexSet.cons_embed) x =
+  ((View.from_single_dimension shape stride).index_fn x : Nat) := by
   have := congrFun (View.cons_to_index_fn_safe_zero_as_index_fn shape stride v2) x
   simp [NatLt.embed_nat] at *
   assumption
@@ -103,13 +103,13 @@ theorem View.cons_max_index_embed_bound_tail :
 
 /- Alternative:
 theorem View.cons_to_index_fn_safe_zero_as_index_fn''  :
-  (View.cons shape stride v2).to_index_fn_safe ∘ IndexSet.cons_embed =
-  NatLt.embedding (View.cons_max_index_embed_bound shape stride v2) ∘ (View.from_single_dimension shape stride).to_index_fn_safe
+  (View.cons shape stride v2).index_fn ∘ IndexSet.cons_embed =
+  NatLt.embedding (View.cons_max_index_embed_bound shape stride v2) ∘ (View.from_single_dimension shape stride).index_fn
 -/
 
 theorem View.cons_to_index_fn_safe_zero_as_index_fn''  :
-  Subtype.val ∘ (View.cons shape stride v2).to_index_fn_safe ∘ IndexSet.cons_embed =
-  Subtype.val ∘ (View.from_single_dimension shape stride).to_index_fn_safe
+  Subtype.val ∘ (View.cons shape stride v2).index_fn ∘ IndexSet.cons_embed =
+  Subtype.val ∘ (View.from_single_dimension shape stride).index_fn
   := by
   funext x
   have := View.cons_to_index_fn_safe_zero shape stride v2 x
@@ -120,12 +120,12 @@ theorem View.cons_to_index_fn_safe_zero_as_index_fn''  :
 
 
 theorem View.cons_to_index_fn_safe_zero_as_index_fn_tail  :
-  Subtype.val ∘ (View.cons shape stride v2).to_index_fn_safe ∘ IndexSet.cons_embed_tail =
-  Subtype.val ∘ v2.to_index_fn_safe
+  Subtype.val ∘ (View.cons shape stride v2).index_fn ∘ IndexSet.cons_embed_tail =
+  Subtype.val ∘ v2.index_fn
   := by
   funext x
-  simp [View.cons, View.to_index_fn_safe, IndexSet.cons_embed_tail]
-  unfold View.to_index_fn_safe_inner
+  simp [View.cons, View.index_fn, IndexSet.cons_embed_tail]
+  unfold View.index_fn_inner
   rw [List.toNats_cons]
   rw [List.inner_prod_cons]
   simp
@@ -133,16 +133,16 @@ theorem View.cons_to_index_fn_safe_zero_as_index_fn_tail  :
 /-
 
 In mathematics, I'd just write
-  (cons_shape shape stride v).to_index_fn_safe =
-  (from_single_dimension shape stride).to_index_fn_safe + (v.to_index_fn_safe)
+  (cons_shape shape stride v).index_fn =
+  (from_single_dimension shape stride).index_fn + (v.index_fn)
 but you need to take care of the embeddings
 
 -/
 
 theorem View.cons_to_index_fn_safe_decomposition (shape stride : PosInt) (v : View) (x : IndexSet (shape :: v.shape)) :
-  (Subtype.val ∘ ((View.cons shape stride v).to_index_fn_safe)) x =
-  (Subtype.val ∘ (View.from_single_dimension shape stride).to_index_fn_safe ∘ Prod.fst ∘ IndexSet.cons_equiv: IndexSet (shape::v.shape) → Nat) x
-  + (Subtype.val ∘ v.to_index_fn_safe ∘ Prod.snd ∘ IndexSet.cons_equiv : IndexSet (shape::v.shape) → Nat) x
+  (Subtype.val ∘ ((View.cons shape stride v).index_fn)) x =
+  (Subtype.val ∘ (View.from_single_dimension shape stride).index_fn ∘ Prod.fst ∘ IndexSet.cons_equiv: IndexSet (shape::v.shape) → Nat) x
+  + (Subtype.val ∘ v.index_fn ∘ Prod.snd ∘ IndexSet.cons_equiv : IndexSet (shape::v.shape) → Nat) x
   := by
   -- do we need View.cons_shape_eq shape stride v ▸ ?
 
@@ -153,12 +153,12 @@ theorem View.cons_to_index_fn_safe_decomposition (shape stride : PosInt) (v : Vi
   rw [<- this]
 
   /- Now simply unfold and use List.inner_prod_cons_as_inner_prods, but we need to be careful with rewrites -/
-  simp [View.cons, View.to_index_fn_safe, View.from_single_dimension]
+  simp [View.cons, View.index_fn, View.from_single_dimension]
   rw [<- this]
   simp
   rw [<- this]
 
-  unfold View.to_index_fn_safe_inner
+  unfold View.index_fn_inner
   rw [List.toNats_cons]
   rw [List.inner_prod_cons_as_inner_prods (α := Nat)]
   simp [List.toNats]
@@ -177,7 +177,7 @@ theorem View.compose_cons (v1 : View) (shape stride : PosInt) (v2 : View) (h: (c
 
   have := View.cons_to_index_fn_safe_decomposition shape stride v2 x
   -- unfold View.to_unraveled_index_fn at *
-  unfold View.to_index_fn_safe at *
+  unfold View.index_fn at *
   unfold NatLt.embedding
   unfold Subtype.map
   simp at *
@@ -195,7 +195,7 @@ theorem View.compose_cons (v1 : View) (shape stride : PosInt) (v2 : View) (h: (c
 
   unfold View.to_unraveled_index_fn
   unfold unravel
-  unfold View.to_index_fn_safe
+  unfold View.index_fn
   simp
 
 
@@ -205,7 +205,7 @@ theorem View.compose_cons (v1 : View) (shape stride : PosInt) (v2 : View) (h: (c
   norm_cast at this
   conv at this =>
     lhs
-    unfold View.to_index_fn_safe_inner
+    unfold View.index_fn_inner
     simp
     apply Subtype.map
     rw [Subtype.coe]
@@ -280,8 +280,8 @@ theorem View.compose_cons_tail (v1 : View) (shape stride : PosInt) (v2 : View) (
   unfold View.compose
   /- Idea of proof: this basically follows from the analogous statement on index functions-/
 
-  have : NatLt.embedding h ∘ (cons shape stride v2).to_index_fn_safe ∘ IndexSet.cons_embed_tail =
-     NatLt.embedding (Nat.le_trans (View.cons_max_index_embed_bound_tail shape stride v2) h) ∘ v2.to_index_fn_safe := by
+  have : NatLt.embedding h ∘ (cons shape stride v2).index_fn ∘ IndexSet.cons_embed_tail =
+     NatLt.embedding (Nat.le_trans (View.cons_max_index_embed_bound_tail shape stride v2) h) ∘ v2.index_fn := by
      /- This is just a small rewrite of View.cons_to_index_fn_safe_zero_as_index_fn_tail -/
      have := View.cons_to_index_fn_safe_zero_as_index_fn_tail shape stride v2
      apply NatLt.embedding_subtype_val_eq_iff.mp
