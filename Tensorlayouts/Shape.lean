@@ -255,7 +255,7 @@ def IndexFnSet (s : Shape) : Type :=
   { f : Fin s.length → Nat // ∀ i, f i < s.get ⟨i, by simp⟩ }
 
 
-@[simps! apply symm_apply]
+-- @[simps! apply symm_apply]
 def IndexSet.fn_equiv {shape : Shape} :
   IndexSet shape ≃ IndexFnSet shape :=
   { toFun x := ⟨fun i => x.val[i]' (by
@@ -297,7 +297,7 @@ def IndexFnSet.zero (s : Shape) : IndexFnSet s :=
  ⟩
 
 theorem IndexFnSet.zero_equiv {s : Shape} : IndexFnSet.zero s = IndexSet.fn_equiv (IndexSet.zero s) := by
-  simp
+  simp [IndexSet.fn_equiv]
   unfold IndexFnSet.zero
   apply Subtype.ext
   simp
@@ -307,7 +307,7 @@ theorem IndexFnSet.zero_equiv {s : Shape} : IndexFnSet.zero s = IndexSet.fn_equi
 
 
 theorem IndexFnSet.induction {s : Shape} (P : IndexFnSet s → Prop)
-  (h0 : P (IndexSet.fn_equiv.toFun (IndexSet.zero s)))
+  (h0 : P (IndexSet.fn_equiv (IndexSet.zero s)))
   (step : ∀ (i : IndexFnSet s) (j : Fin s.length) (h : i.val j + 1 < s.get j), P i → P (incrementIndex i j h)) :
   ∀ (i : IndexFnSet s), P i := by
   intro i

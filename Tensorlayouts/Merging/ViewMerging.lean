@@ -41,6 +41,12 @@ theorem View.is_merge_implies_shape_eq (v v1 v2 : View) (h_merge : View.is_merge
   exact Eq.symm hshape
 
 
+theorem View.compose_is_increasing (v1 v2 : View) (h_maxsize : v2.max_index ≤ v1.shape.max_index)
+  (i : IndexFnSet v2.shape)  (j : Fin v2.shape.length) (h : i.val j + 1 < v2.shape.get j) :
+    (v1.compose v2 h_maxsize (IndexSet.fn_equiv.symm (incrementIndex i j h))).val
+  ≥ (v1.compose v2 h_maxsize (IndexSet.fn_equiv.symm i)).val := by
+  sorry
+
 /- ## Example: left canonical is always mergeable -/
 
 /-- An example of a mergeable view: if the left is canonical, then any view is mergeable with it -/
@@ -58,9 +64,7 @@ theorem View.is_mergeable_left_canonical (s : Shape) (v2 : View) (hmaxsize : v2.
   rfl
 
 
-
 /- ## Straight at the target -/
-
 
 theorem compose_is_linear_if_mergeable
   (v1 v2: View) (h_maxsize : v2.max_index ≤ v1.shape.max_index)
@@ -95,8 +99,8 @@ theorem compose_is_linear_if_mergeable
     subst hshape
 
     have := View.index_fn_is_linear { shape := v2.shape, stride := vstride, lengthEq := vlengthEq } i j (by sorry)
-    simp at this
-    simp
+    simp [IndexSet.fn_equiv] at this
+    simp [IndexSet.fn_equiv]
     rw [<- this]
 
 
@@ -133,7 +137,7 @@ theorem mergeability_criterion (v1 v2: View) :
   exists stride
   intro i j h_j
 
-  simp
+  simp [IndexSet.fn_equiv]
   have := compose_is_linear_if_mergeable v1 v2 h_maxsize h_is_mergeable' i j h_j
 
   unfold IndexSet.fn_equiv at this
@@ -166,48 +170,41 @@ theorem mergeability_criterion (v1 v2: View) :
   exists hshape
   exists h_composable
 
-
   simp
 
   have h_eq_on_fn :
     ∀ (i : IndexFnSet v2.shape),
     (NatLt.embed_nat ∘ Eq.rec (motive := fun x h ↦ IndexSet x → NatLt v.max_index)
-       v.index_fn (View.is_merge.proof_2 v v2 hshape)) (IndexSet.fn_equiv.invFun i) =
-    (NatLt.embed_nat ∘ v1.compose v2 h_composable) (IndexSet.fn_equiv.invFun i) :=
+       v.index_fn (View.is_merge.proof_2 v v2 hshape)) (IndexSet.fn_equiv.symm i) =
+    (NatLt.embed_nat ∘ v1.compose v2 h_composable) (IndexSet.fn_equiv.symm i) :=
     by
       apply IndexFnSet.induction
-      . have := IndexSet.fn_equiv.left_inv (x := (IndexSet.zero v2.shape))
-        rw [this]
-        simp
+      . simp
         sorry -- create two lemmas: (1) v.index_fn (IndexSet.zero v2.shape) = 0; (2) v1.compose v2 h_composable (IndexSet.zero v2.shape) = 0
-      . intro i j h_j
-        simp
-        rw [h_stride_eq]
-        simp
-        rw [h_stride_eq]
+      . intro i j h_j ih
         simp
 
+        -- need to get rid of: v2.shape = v.shape, because then we get rid of annoying casts
+        unfold v
+        unfold v at ih
+        simp at ih
+        simp only [Function.comp_apply, NatLt.embed_nat_coe]
 
+        -- rewrite the left hand side: basically index_fn(i) + stride(j)
+        simp [View.index_fn_step_is_stride]
 
-        unfold IndexSet.fn_equiv.toFun
+        -- rewrite the right hand side: basically v1.compose v2 h_composable (IndexSet.fn_equiv.symm i) + stride j
+        have : ↑(v1.compose v2 h_composable (IndexSet.fn_equiv.symm (incrementIndex i j h_j)))
+             = ↑(v1.compose v2 h_composable (IndexSet.fn_equiv.symm i)) + stride j := by
+          rw [<- Nat.sub_eq_iff_eq_add']
+          rw [h_stride_eq]
+          apply View.compose_is_increasing
+        rw [this]
 
-
-
-
-        rw [<- IndexFnSet.zero_equiv]
-
+        -- now conclude by rewriting with the induction hypothesis
+        rw [ih]
+        unfold stride_as_list
         simp
-        rw [IndexSet.zero_getElem_zero]
-        simp
-
-
-
-
-        rw [IndexSet.zero_getElem_zero]
-        simp [IndexSet.zero_getElem_zero]
-
-
-
 
   funext i
   simp

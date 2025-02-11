@@ -16,3 +16,4 @@
 - coerce or `List.unnatach` instead of `.toNats`?
 
 - how should you use the equivalence? should you use `.toFun` and `.invFun`? I think you probably shouldn't, but sometimes `simp` produces it, and then it's difficult to get rid of, making rewrites that don't involve `.toFun`/`.invFun` difficult
+  - I think I should try to stick to the version without `.toFun` and `.invFun`

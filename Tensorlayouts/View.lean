@@ -350,6 +350,16 @@ theorem View.index_fn_is_linear (v: View) (i : IndexFnSet v.shape) (j : Fin v.sh
     (v.index_fn (IndexSet.fn_equiv.symm (incrementIndex i j h))).val
   - (v.index_fn (IndexSet.fn_equiv.symm i)).val
   = (v.index_fn (IndexSet.fn_equiv.symm (incrementIndex (IndexSet.zero v.shape).fn_equiv j (by sorry)))).val := by
+  /- BELANGRIJK GEBLEVEN : deze twee lemmas zijn belangrijk om nog op te lossen -/
+  sorry
+
+
+theorem View.index_fn_step_is_stride (v: View) (i : IndexFnSet v.shape) (j : Fin v.shape.length) (h : i.val j + 1 < v.shape.get j) :
+    (v.index_fn (IndexSet.fn_equiv.symm (incrementIndex i j h))).val =
+    (v.index_fn (IndexSet.fn_equiv.symm i)).val + v.stride.get ⟨↑j, (by
+      rw [<- v.lengthEq]
+      exact j.isLt
+    )⟩ := by
   sorry
 
 
