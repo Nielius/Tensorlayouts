@@ -188,6 +188,14 @@ theorem List.scanr_length {α β : Type}  (f : α → β → β) (init : β) (l 
     exact Nat.succ_inj'.mpr ih
 
 
+theorem List.getElem?_zero_getD_eq_headD {α : Type} (l : List α) :
+  l[0]?.getD = l.headD := by
+  funext d
+  rw [List.headD_eq_head?_getD]
+  congr
+  rw [List.head?_eq_getElem?]
+
+
 theorem List.scanr_length_tail {α β : Type}  (f : α → β → β) (init : β) (l : List α) :
   List.length ((List.scanr f init l).tail) = List.length l := by
   simp [List.scanr_length]
@@ -198,14 +206,11 @@ theorem List.scanr_head_eq_foldr {α β : Type}  (f : α → β → β) (init : 
   ∃ (hnonempty: scanlist ≠ []), List.head scanlist hnonempty = f hd (List.foldr f init tl) := by
   simp
 
-theorem List.scanr_head_eq_foldr_D {α β : Type}  (f : α → β → β) (init : β) (l : List α) :
-  let scanlist := List.scanr f init l
-  List.headD scanlist init = List.foldr f init l := by
+theorem List.scanr_headD_eq_foldr {α β : Type}  (f : α → β → β) (init : β) (l : List α) :
+  (List.scanr f init l).headD init = List.foldr f init l := by
   match l with
   | [] => rfl
   | hd :: tl =>
-      intro scanlist
-      unfold scanlist
       rw [List.scanr_cons]
       simp
 

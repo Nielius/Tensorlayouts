@@ -10,7 +10,7 @@ import Mathlib.Data.List.OfFn
 /- ## Shape and Stride -/
 
 def Shape :=  List PosInt
-def Stride := List PosInt
+def Stride := List Nat -- allowing 0 for stride might even be easier
 
 deriving instance Repr for Shape
 deriving instance Repr for Stride
@@ -19,60 +19,71 @@ deriving instance DecidableEq for Stride
 deriving instance Append for Shape
 deriving instance Append for Stride
 
-instance : GetElem Shape Nat PosInt (fun s i => i < s.length) where
+instance : Coe (List PosInt) (List Nat) :=
+  ⟨List.map Subtype.val⟩
+
+instance : Coe Shape (List Nat) :=
+  ⟨List.map Subtype.val⟩
+
+instance : GetElem (List PosInt) Nat PosInt (fun s i => i < s.length) where
   getElem s i h := s.get ⟨i, h⟩
 
-instance : GetElem Stride Nat PosInt (fun s i => i < s.length) where
-  getElem s i h := s.get ⟨i, h⟩
+-- def List.toNats (l : List PosInt) : List Nat :=
+--   List.map (fun (x: PosInt) => (x : Nat)) l
 
-def List.toNats (l : List PosInt) : List Nat :=
-  List.map (fun (x: PosInt) => (x : Nat)) l
+-- theorem List.toNats_length (l : List PosInt) : List.length (List.toNats l) = List.length l := by
+--   unfold List.toNats
+--   simp
 
-theorem List.toNats_length (l : List PosInt) : List.length (List.toNats l) = List.length l := by
-  unfold List.toNats
+-- theorem List.toNats_getElem (l : List PosInt) (i : Nat) (h : i < List.length l) :
+--   (List.toNats l).get ⟨i, (List.toNats_length l) ▸ h⟩ = l.get ⟨i, h⟩ := by
+--   unfold List.toNats
+--   simp
+
+-- theorem List.toNats_nil : List.toNats [] = [] := by
+--   unfold List.toNats
+--   simp
+
+-- theorem List.toNats_cons (hd : PosInt) (tl : List PosInt)  :
+--   List.toNats (hd :: tl) = (hd : Nat) :: List.toNats tl := by
+--   unfold List.toNats
+--   simp
+
+/- These don't seem to be necessary, because you can just use simp?
+   Or maybe List.map_cons?
+theorem ListPosInt.toNats_cons (hd : PosInt) (tl : List PosInt) :
+  ((hd :: tl) : List Nat) = (hd : Nat) :: (tl : List Nat) := by
+  simp?
+
+theorem Shape.coe_cons (hd : PosInt) (tl : Shape) :
+  ((hd :: tl) : List Nat) = (hd : Nat) :: (tl : List Nat) := by
   simp
-
-theorem List.toNats_getElem (l : List PosInt) (i : Nat) (h : i < List.length l) :
-  (List.toNats l).get ⟨i, (List.toNats_length l) ▸ h⟩ = l.get ⟨i, h⟩ := by
-  unfold List.toNats
-  simp
-
-theorem List.toNats_nil : List.toNats [] = [] := by
-  unfold List.toNats
-  simp
-
-theorem List.toNats_cons (hd : PosInt) (tl : List PosInt)  :
-  List.toNats (hd :: tl) = (hd : Nat) :: List.toNats tl := by
-  unfold List.toNats
-  simp
+-/
 
 def Stride.from_shape (shape : Shape) : Stride :=
-  List.tail (List.scanr (· * ·) ⟨1, by simp⟩ shape)
+  List.tail (List.scanr (· * ·) 1 shape)
 
-def Stride.from_shape_nil : Stride.from_shape [] = [] := by
-  unfold Stride.from_shape
-  rw [List.scanr_nil]
-  simp
+theorem Stride.from_shape_nil : Stride.from_shape [] = [] := by unfold Stride.from_shape; simp
 
-def Stride.from_shape_cons (hd : PosInt) (tl : List PosInt) :
+theorem Stride.from_shape_cons (hd : PosInt) (tl : List PosInt) :
   Stride.from_shape (hd :: tl) =
     let stride_tail := Stride.from_shape tl
-    (tl.headD ⟨1, by simp⟩ * stride_tail.headD ⟨1, by simp⟩) :: stride_tail := by
+    (tl.headD ⟨1, by simp⟩ * stride_tail.headD 1) :: stride_tail := by
   unfold Stride.from_shape
-  rw [List.scanr_cons_as_cons_scanr]
   simp
 
   induction tl
   case nil =>
     simp
-    unfold HMul.hMul
-    unfold instHMulPosInt
-    simp
   case cons hd' tl' ih =>
-    rw [List.scanr_cons_as_cons_scanr]
     simp
     congr
-    apply List.head?_eq_getElem?
+    rw [List.getElem?_zero_getD_eq_headD]
+    rw [List.scanr_headD_eq_foldr]
+
+theorem Stride.from_shape_length (shape : Shape) : List.length (Stride.from_shape shape) = List.length shape :=
+  by simp only [Stride.from_shape,List.scanr_length_tail, List.length_map]
+
 
 
 /- ## Indexing for shapes -/
@@ -83,12 +94,11 @@ def Stride.from_shape_cons (hd : PosInt) (tl : List PosInt) :
  'Strict' means strict inequality, i.e. idx < shape.max_index
 -/
 def Shape.max_index (shape : Shape) : Nat :=
-  Nat.prod shape.toNats
+  Nat.prod shape
 
 theorem Shape.max_index_cons (a : PosInt) (shape : Shape) :
   Shape.max_index (a :: shape) = a * Shape.max_index shape := by
-  unfold Shape.max_index
-  rw [List.toNats_cons, Nat.prod_cons]
+  simp only [Shape.max_index, List.map_cons, Nat.prod_cons]
 
 def Shape.max_index_posint (shape : Shape) : PosInt :=
   ⟨ shape.max_index, by
@@ -96,45 +106,35 @@ def Shape.max_index_posint (shape : Shape) : PosInt :=
     simp [Shape.max_index, Nat.prod]
     induction shape
     case nil =>
-      rw [List.toNats_nil, List.foldr_nil]
-      simp
+      simp only [List.map_nil, List.foldr_nil, Nat.lt_add_one]
     case cons hd tl ih =>
-      rw [List.toNats_cons, List.foldr_cons]
+      rw [List.map_cons, List.foldr_cons]
       simp_all only [Nat.mul_pos_iff_of_pos_right]
       exact hd.property
   ⟩
 
+@[simp]
 theorem Shape.max_index_posint_coe (shape : Shape) :
-  (Shape.max_index_posint shape : Nat) = Shape.max_index shape := by
-  unfold Shape.max_index_posint Shape.max_index
-  simp
+  (Shape.max_index_posint shape : Nat) = Shape.max_index shape :=
+  by
+   simp only [Shape.max_index_posint, Shape.max_index]
 
-def Stride.from_shape_cons_max_index (hd : PosInt) (tl : List PosInt) :
+def Stride.from_shape_cons_eq_max_index (hd : PosInt) (tl : Shape) :
   Stride.from_shape (hd :: tl) =
-  Shape.max_index_posint tl :: Stride.from_shape tl := by
+  (Shape.max_index_posint tl : Nat) :: Stride.from_shape tl := by
   rw [Stride.from_shape_cons]
   simp
   congr
-  unfold Shape.max_index_posint Shape.max_index
+  unfold Shape.max_index
   induction tl
   case nil =>
-    simp
-    rw [Stride.from_shape_nil]
-    simp
-    conv in [].toNats => rw [List.toNats_nil]
-    conv in Nat.prod [] => rw [Nat.prod_nil]
-    -- this is annoying: everytime I'm multiplying PosInts, I can't just use omega...
-    simp [instHMulPosInt]
+    simp only [List.head?_nil, Option.getD_none, Nat.one_mul, List.map_nil, Stride.from_shape_nil]
+    rfl
   case cons hd' tl' ih =>
     rw [Stride.from_shape_cons]
     unfold List.head?
-    simp
-    rw [ih]
-    conv =>
-      rhs
-      enter [1]
-      rw [List.toNats_cons, Nat.prod_cons]
-    simp [instHMulPosInt]
+    simp [ih, Nat.prod_cons]
+
 
 /--
 Returns whether an index is valid for a given shape by checking:
@@ -226,7 +226,6 @@ theorem Shape.max_index_tail : ∀ (s : Shape) (s' : PosInt),
   intro s s'
   unfold Shape.max_index
   unfold Nat.prod
-  unfold List.toNats
   simp
 
 theorem Shape.max_index_tail_increase : ∀ (s : Shape) (s' : PosInt),

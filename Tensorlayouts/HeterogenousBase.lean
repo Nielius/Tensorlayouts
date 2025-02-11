@@ -6,8 +6,8 @@ namespace HeterogenousBase
 /-- back-and-forth in the heterogeneous base; mostly a helper function -/
 def heterogenous_base_bnf (s : Shape) : Nat -> Nat :=
   fun x =>
-    (Stride.from_shape s).toNats.inner_prod
-    (List.zipWith (fun shape stride => (x / stride % shape)) s.toNats (Stride.from_shape s).toNats)
+    (Stride.from_shape s).inner_prod
+    (List.zipWith (fun shape stride => (x / stride % shape)) s (Stride.from_shape s))
 
 
 theorem heterogenous_base_bnf_cons : ∀ (shead : PosInt) (stail : Shape) (x : Nat),
@@ -16,10 +16,8 @@ theorem heterogenous_base_bnf_cons : ∀ (shead : PosInt) (stail : Shape) (x : N
   heterogenous_base_bnf stail x := by
   intro shead stail x
   unfold heterogenous_base_bnf
-  rw [Stride.from_shape_cons_max_index]
-  rw [List.toNats_cons]
-  rw [List.toNats_cons]
-  rw [List.zipWith_cons_cons]
+  rw [Stride.from_shape_cons_eq_max_index]
+  simp only [List.map_cons, List.zipWith_cons_cons]
   rw [List.inner_prod_cons]
 
 
@@ -113,7 +111,6 @@ theorem heterogenous_base : ∀ (s : Shape) (x : Nat),
     unfold heterogenous_base_bnf
     unfold Shape.max_index
     unfold Nat.prod
-    unfold List.toNats
     unfold List.inner_prod
     simp
     omega

@@ -26,10 +26,20 @@ def View.from_shape (shape : Shape) : View := {
   lengthEq := by
     unfold Stride.from_shape
     rw [List.scanr_length_tail]
+    simp only [List.length_map]
 }
 
 theorem View.from_shape_nil : View.from_shape [] = {shape := [], stride := [], lengthEq := by simp} := by
   simp [View.from_shape, Stride.from_shape]
+
+theorem View.from_shape_cons : View.from_shape (s :: tl) = {
+  shape := s :: tl,
+  stride := (tl.headD ⟨1, by simp⟩ * (Stride.from_shape tl).headD 1) :: Stride.from_shape tl,
+  lengthEq := by sorry
+} := by
+  unfold View.from_shape
+  simp [Stride.from_shape_cons]
+
 
 theorem View.from_shape_shape_eq (s: Shape) : (View.from_shape s).shape = s := by
   unfold View.from_shape
@@ -43,8 +53,10 @@ theorem View.from_shape_stride_shape_length_eq (s: Shape) : (List.length s) = (V
   unfold View.from_shape
   unfold Stride.from_shape
   rw [List.scanr_length_tail]
+  simp only [List.length_map]
 
-def View.from_single_dimension (shape stride : PosInt) : View := {
+
+def View.from_single_dimension (shape : PosInt) (stride : Nat) : View := {
   shape := [shape],
   stride := [stride],
   lengthEq := by simp
@@ -55,7 +67,7 @@ theorem View.from_single_dimension_shape_eq (shape stride : PosInt) :
   unfold View.from_single_dimension
   simp
 
-theorem View.from_single_dimension_stride_eq (shape stride : PosInt) :
+theorem View.from_single_dimension_stride_eq (shape : PosInt) (stride : Nat) :
   (View.from_single_dimension shape stride).stride = [stride] := by
   unfold View.from_single_dimension
   simp
@@ -74,7 +86,7 @@ theorem View.nil_stride_eq : (View.nil).stride = [] := by
   unfold View.nil
   simp
 
-def View.cons (shape: PosInt) (stride : PosInt): View -> View :=
+def View.cons (shape: PosInt) (stride : Nat): View -> View :=
   fun v => {
     shape := shape :: v.shape,
     stride := stride :: v.stride,
@@ -91,7 +103,7 @@ theorem View.cons_shape_eq_cons_shape_iff {shape shape' : PosInt} {stride stride
   repeat rw [View.cons_shape_eq]
   apply List.cons_eq_cons
 
-theorem View.cons_stride_eq (shape stride : PosInt) (v : View) :
+theorem View.cons_stride_eq (shape : PosInt) (stride : Nat) (v : View) :
   (View.cons shape stride v).stride = stride :: v.stride := by
   unfold View.cons
   simp
@@ -99,7 +111,7 @@ theorem View.cons_stride_eq (shape stride : PosInt) (v : View) :
 
 theorem View.induction (P : View → Prop)
   (nil : P View.nil)
-  (cons : ∀ (x : PosInt) (xs : Shape) (y : PosInt) (ys : Stride)
+  (cons : ∀ (x : PosInt) (xs : Shape) (y : Nat) (ys : Stride)
           (h : xs.length = ys.length)
           (ih : P ⟨xs, ys, h⟩),
           P ⟨x::xs, y::ys, congrArg Nat.succ h⟩) :
@@ -149,70 +161,65 @@ theorem View.induction (P : View → Prop)
   so that it is compatible with Shape.max_index (as proven by View.max_index_from_shape).
 -/
 def View.max_index (v : View) : Nat :=
-  v.stride.toNats.inner_prod (v.shape.toNats.map (fun x => x - 1)) + 1
+  v.stride.inner_prod (v.shape.map (fun x => x - 1)) + 1
 
 
 theorem View.cons_max_index :
   (View.cons shape_head stride_head v).max_index
   = (shape_head - 1) * stride_head + v.max_index := by
   unfold View.max_index
-  simp [View.cons, List.toNats_cons, List.inner_prod_cons, List.map_cons, List.foldr_cons]
+  simp [View.cons, List.inner_prod_cons, List.map_cons, List.foldr_cons]
   simp_arith
   apply Nat.mul_comm
 
 
 theorem View.nil_max_index : (View.nil).max_index = 1 := by
   unfold View.max_index
-  simp [View.nil, List.toNats, List.inner_prod, List.map, List.foldr]
+  simp [View.nil]
+  rfl
 
 
 theorem View.max_index_is_positive : ∀ (v : View), v.max_index > 0 := by
   intro v
   unfold View.max_index
-  simp [View.nil, List.toNats, List.inner_prod, List.map, List.foldr]
+  simp [View.nil]
 
 
 theorem View.max_index_from_shape (s : Shape) : (View.from_shape s).max_index = s.max_index := by
   induction s
   case nil =>
-    simp [View.max_index, Shape.max_index, List.toNats, Nat.prod, View.from_shape_nil]
-    apply (@List.inner_prod_nil_nil Nat)
+    simp [View.max_index, Shape.max_index, View.from_shape_nil]
+    rfl
 
   case cons hd tl ih =>
-    conv =>
-      rhs
-      rw [Shape.max_index_cons]
-
-    conv =>
-      lhs
-      unfold View.from_shape
-      pattern (Stride.from_shape (hd :: tl))
-      rw [Stride.from_shape_cons_max_index]
-
+    -- The only non-straightforward part is Stride.from_shape_cons_eq_max_index,
+    -- and perhaps the
+    simp [Shape.max_index_cons, Stride.from_shape_cons_eq_max_index]
     unfold View.max_index
     simp
-    simp [List.toNats_cons, List.map_cons, List.inner_prod_cons]
     rw [← ih]
+    rw [View.from_shape_stride_eq]
+    rw [Stride.from_shape_cons_eq_max_index]
+    rw [View.from_shape_shape_eq]
+    simp
 
-    have heq:  (List.toNats (Stride.from_shape tl)).inner_prod (List.map (fun x ↦ x - 1) tl.toNats) + 1 = (from_shape tl).max_index := by
+    have heq:  ((Stride.from_shape tl)).inner_prod (List.map ((fun x ↦ x - 1) ∘ Subtype.val) tl) + 1 = (from_shape tl).max_index := by
       unfold View.max_index
-      rw [View.from_shape_shape_eq, View.from_shape_stride_eq]
+      rw [View.from_shape_shape_eq, View.from_shape_stride_eq, List.comp_map]
 
     conv =>
       lhs
+      rw [List.inner_prod_cons]
       rw [Nat.add_assoc]
       rw [heq]
-
-    have hsuf :  ↑(Shape.max_index_posint tl) = (from_shape tl).max_index := by
-      rw [Shape.max_index_posint_coe]
+      rw [Nat.mul_comm]
       rw [ih]
-
-    rw [hsuf]
-    rw [Nat.mul_comm]
-    rw [← Nat.succ_mul]
-    simp_arith
+      simp
+      rw [← Nat.succ_mul]
+      simp
 
     rw [Nat.sub_add_cancel]
+    rw [ih]
     apply hd.property
 
 
@@ -221,7 +228,7 @@ theorem View.from_single_dimension_max_index_eq : ∀ (shape stride : PosInt),
   intro shape stride
   unfold View.from_single_dimension
   unfold View.max_index
-  simp [List.inner_prod, List.toNats]
+  simp [List.inner_prod]
   apply Nat.mul_comm
 
 
@@ -246,7 +253,7 @@ theorem View.from_single_dimension_max_index_le : ∀ (shape stride : PosInt),
 
 
 def View.to_index_fn_safe_inner (v : View) : List Nat -> Nat :=
-  v.stride.toNats.inner_prod
+  v.stride.inner_prod
 
 theorem View.to_index_fn_safe_inner_additive (v : View) (l l' : List Nat) :
   v.to_index_fn_safe_inner (List.zipWith (fun x y => x + y) l l') = v.to_index_fn_safe_inner l + v.to_index_fn_safe_inner l' := by
@@ -257,7 +264,7 @@ def View.to_index_fn_safe (v : View) : (IndexSet v.shape) -> NatLt v.max_index :
     intro idx hvalid
     unfold View.to_index_fn_safe_inner
     simp
-    have hasdf : forall (n : Nat), n = v.shape.length -> (v.stride.toNats.inner_prod idx < v.max_index) := by
+    have hasdf : forall (n : Nat), n = v.shape.length -> (v.stride.inner_prod idx < v.max_index) := by
       -- introducing this is the only way I know of doing induction on n, while keeping the right hypotheses in the goal
       intro n hn
       induction n
@@ -273,7 +280,7 @@ def View.to_index_fn_safe (v : View) : (IndexSet v.shape) -> NatLt v.max_index :
           assumption
 
         simp [hshape_empty, hstride_empty]
-        simp [View.max_index, List.toNats, List.inner_prod, List.map, List.foldr]
+        simp [View.max_index, List.inner_prod, List.map, List.foldr]
 
       case succ n ih =>
         -- I should have made sure the induction hypothesis holds for any view, not just this v
@@ -306,9 +313,9 @@ theorem View.from_single_dimension_index_fn_safe_eq (shape stride : PosInt) :
   simp at this
   rw [<- this]
 
-  simp [View.from_single_dimension, View.to_index_fn_safe, List.toNats]
+  simp [View.from_single_dimension, View.to_index_fn_safe]
   unfold View.to_index_fn_safe_inner
-  simp [View.from_single_dimension, View.to_index_fn_safe, List.toNats]
+  simp [View.from_single_dimension, View.to_index_fn_safe]
 
   conv =>
     lhs
@@ -338,7 +345,7 @@ theorem View.len_1_from_single_dimension (v: View) (hlen: v.shape.length = 1) :
   sorry
 
 def View.from_linear_function (f : LinearIntegerFunc) : View :=
-  View.from_single_dimension ⟨f.max_val, by sorry ⟩ ⟨f.slope, by sorry ⟩
+  View.from_single_dimension ⟨f.max_val, by sorry ⟩ f.slope
 
 theorem View_from_linear_function_to_linear_function (f : LinearIntegerFunc) :
   NatLt.embed_nat ∘ (View.from_linear_function f).to_index_fn_safe = f.fun ∘ IndexSet.from_single_dimension_equiv := by
@@ -356,7 +363,7 @@ theorem View.from_linear_function_shape_eq (f : LinearIntegerFunc) :
 
 def unravel_inner (s : Shape) : Nat -> List Nat :=
   fun idx =>
-    List.zipWith (fun shape stride => (idx / stride) % shape) s.toNats (Stride.from_shape s).toNats
+    List.zipWith (fun shape stride => (idx / stride) % shape) s (Stride.from_shape s)
 
 
 def unravel (s : Shape) : NatLt s.max_index -> IndexSet s :=
@@ -366,23 +373,17 @@ def unravel (s : Shape) : NatLt s.max_index -> IndexSet s :=
       unfold Shape.is_valid_index
       simp
 
-      have hlen : s.toNats.length ⊓ (Stride.from_shape s).toNats.length = List.length s := by
-        unfold List.toNats
-        simp
-        have hlenstride : s.length = (Stride.from_shape s).length := by
-          unfold Stride.from_shape
-          rw [List.scanr_length_tail]
-        rw [hlenstride]
+      have hlen : List.length s ≤ List.length (Stride.from_shape s) := by rw [Stride.from_shape_length]
       exists hlen
+
+      have hminlen : s.length ⊓ (Stride.from_shape s).length = List.length s := by
+        simp only [inf_eq_left, Stride.from_shape_length, le_refl]
 
       intros i hbound
       rw [<- Nat.lt_min] at hbound
-      rewrite [hlen] at hbound
-      have hstride : (List.toNats s)[i] = (s)[i] := by
-        exact List.toNats_getElem s i hbound
-      rw [hstride]
+      rewrite [hminlen] at hbound
       apply Nat.mod_lt
-      exact s[i].property
+      exact (s.get ⟨i, hbound⟩).property
   )
 
 /--
@@ -493,6 +494,6 @@ theorem unravel_correct' (s : Shape) :
 
 def View.example : View := {
   shape := [⟨2, by simp⟩, ⟨3, by simp⟩, ⟨4, by simp⟩],
-  stride := [⟨12, by simp⟩, ⟨4, by simp⟩, ⟨1, by simp⟩],
+  stride := [12, 4, 1],
   lengthEq := by simp
 }

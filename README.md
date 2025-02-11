@@ -13,3 +13,4 @@
 
 - use `Fin` from `Mathlib.Data.Fin.Basic` instead of `NatLt`; it is basically the same
 - maybe use `Fin n \to Nat` for indices, rather than lists
+- coerce or `List.unnatach` instead of `.toNats`?
