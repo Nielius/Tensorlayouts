@@ -1,5 +1,9 @@
 import Mathlib.Data.List.Basic -- needed for e.g. List.scanr_nil; this is part of simp
 import Mathlib.Algebra.Group.Defs -- for AddMonoid
+import Mathlib.Data.Finset.Basic -- for Finset.range
+import Mathlib.Data.Fintype.BigOperators -- for ∑
+import Mathlib.Algebra.BigOperators.Fin -- for Fin.sum_univ_succ
+
 
 def Nat.prod (l : List Nat) : Nat :=
   List.foldr (fun x acc => x * acc) 1 l
@@ -18,6 +22,10 @@ def List.inner_prod {α: Type} [Mul α] [Add α] [Zero α] (l : List α) (r : Li
 
 theorem List.inner_prod_nil_nil {α: Type} [Mul α] [Add α] [Zero α] :
    List.inner_prod [] [] = 0 := by
+  simp [List.inner_prod, List.sum_nil, List.zipWith_nil_right]
+
+theorem List.inner_prod_nil {α: Type} [Mul α] [Add α] [Zero α] {r : List α} :
+   List.inner_prod [] r = 0 := by
   simp [List.inner_prod, List.sum_nil, List.zipWith_nil_right]
 
 theorem List.inner_prod_cons {α: Type} [Mul α] [Add α] [Zero α] (a : α) (l : List α) (b : α) (r : List α) :
@@ -41,6 +49,124 @@ theorem List.inner_prod_cons_as_inner_prods {α: Type} [Mul α] [AddMonoid α] (
     unfold List.zipWith
     simp
 
+theorem List.inner_prod_indexed {α: Type} [Mul α] [AddCommMonoid α]
+   (l : List α) (r : List α)
+   (h_len : l.length = r.length) :
+   l.inner_prod r = ∑ i : Fin l.length, l[i] * r[i] :=
+   by
+   -- revert r
+   induction l generalizing r
+   case nil =>
+    simp [List.inner_prod_nil]
+   case cons hd tl ih =>
+    cases r with
+    | nil =>
+      contradiction
+    | cons hd' tl' =>
+      rw [List.inner_prod_cons]
+      simp
+      rw [Fin.sum_univ_succ]
+      simp
+      have := ih tl' (by
+        rw [List.length_cons] at h_len
+        rw [List.length_cons] at h_len
+        rw [Nat.add_one_inj] at h_len
+        exact h_len
+      )
+      rw [this]
+      simp
+
+def List.zeros (len : Nat) : List Nat :=
+  List.replicate len 0
+
+theorem List.inner_prod_zeros_left {len : Nat} :
+  ∀ (r : List Nat), List.inner_prod (List.zeros len) r = 0 := by
+  induction len
+  . intro r
+    simp [List.zeros]
+    unfold List.inner_prod
+    simp only [zipWith_nil_left, sum_nil]
+  case succ len ih =>
+    simp [List.zeros]
+    rw [List.replicate_succ]
+    intro r
+    cases r
+    case nil =>
+      unfold List.inner_prod
+      simp
+    case cons hd tl =>
+      rw [List.inner_prod_cons]
+      have := ih tl
+      simp [List.zeros] at this
+      rw [this]
+      simp
+
+def List.incrementNth (xs : List Nat) (idx : Nat) : List Nat :=
+  xs.modify (fun x => x + 1) idx
+
+theorem List.incrementNth_length {xs : List Nat} (idx : Nat) :
+  (xs.incrementNth idx).length = xs.length :=
+  by
+    unfold List.incrementNth
+    apply List.length_modify
+
+
+theorem List.incrementNth_cons {x : Nat} {xs : List Nat} (idx : Nat) :
+  (x :: xs).incrementNth (idx + 1) = x :: xs.incrementNth idx := by
+    unfold List.incrementNth
+    unfold modify
+    simp
+
+
+lemma List_inner_prod_increment_left_head {x : Nat} {xs : List Nat} {y : Nat} {ys : List Nat} :
+  ((x + 1) :: xs).inner_prod (y :: ys) = (x :: xs).inner_prod (y :: ys) + y := by
+  repeat rw [List.inner_prod_cons]
+  rw [Nat.add_mul]
+  omega
+
+
+theorem List.inner_prod_increment_left {xs : List Nat} {ys : List Nat} (h_len : xs.length = ys.length) :
+  ∀ (idx : Fin xs.length), List.inner_prod (xs.incrementNth idx) ys = List.inner_prod xs ys + ys[idx] := by
+  induction xs generalizing ys
+  case nil =>
+    intros idx
+    -- Since xs is empty, xs.length = 0, so there is no element of type Fin xs.length.
+    apply Fin.elim0
+    assumption
+  case cons x xs ih =>
+    intros idx
+    cases ys with
+    | nil =>
+      simp at h_len
+    | cons y ys' =>
+      -- Since (x :: xs).length = (y :: ys').length, we have xs.length = ys'.length.
+      have h_len' : xs.length = ys'.length := by exact Nat.succ_inj'.mp h_len
+      -- Now do a case analysis on idx.
+      rcases idx with ⟨k, hk⟩
+      simp
+      cases k with
+      | zero =>
+        simp
+        unfold List.incrementNth
+        unfold modify
+        simp
+        rw [List_inner_prod_increment_left_head]
+      | succ k' =>
+        simp
+        rw [List.incrementNth_cons]
+        rw [List.inner_prod_cons]
+        let k'fin : Fin (xs.length) := ⟨k', by simp at hk; exact hk ⟩
+        have : k' = k'fin.val := by unfold k'fin; simp
+        conv =>
+          lhs
+          rw [this]
+        rw [@ih]
+        conv =>
+          rhs
+          rw [List.inner_prod_cons]
+        simp
+        rw [Nat.add_assoc]
+        assumption
 
 
 /-- ## PosInt -/
