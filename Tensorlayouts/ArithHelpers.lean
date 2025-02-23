@@ -16,6 +16,65 @@ theorem Nat.prod_cons : Nat.prod (a :: l) = a * Nat.prod l := by
   unfold Nat.prod
   rw [List.foldr_cons]
 
+def List.zeros (len : Nat) : List Nat :=
+  List.replicate len 0
+
+/- ## List.incrementNth -/
+
+def List.incrementNth (xs : List Nat) (idx : Nat) : List Nat :=
+  xs.modify (fun x => x + 1) idx
+
+@[simp]
+theorem List.incrementNth_length {xs : List Nat} (idx : Nat) :
+  (xs.incrementNth idx).length = xs.length :=
+  by
+    unfold List.incrementNth
+    apply List.length_modify
+
+theorem List.incrementNth_cons {x : Nat} {xs : List Nat} (idx : Nat) :
+  (x :: xs).incrementNth (idx + 1) = x :: xs.incrementNth idx := by
+    unfold List.incrementNth
+    unfold modify
+    simp
+
+theorem List.incrementNth_ite (xs : List Nat) (idx : Nat) (j : Fin xs.length) :
+  (xs.incrementNth idx)[j] = if j.val = idx then xs[j] + 1 else xs[j] := by
+  induction xs generalizing idx
+  case nil =>
+    apply Fin.elim0 j
+  case cons x xs ih =>
+    unfold List.incrementNth
+    unfold modify
+    simp
+    cases idx
+    case zero =>
+      simp
+      by_cases h : j.val = 0
+      . simp [h]
+        have : j = ⟨ 0, by simp ⟩ := by rw [<- Fin.val_eq_val]; assumption
+        rw [this]
+        simp
+      . simp [h]
+        have : j ≠ ⟨ 0, by simp ⟩ := by unfold Ne; rw [<- Fin.val_eq_val]; exact h
+        obtain ⟨j', hj'⟩ := Fin.exists_succ_eq_of_ne_zero this
+        rw [<- hj']
+        simp
+    case succ idx' =>
+      simp
+      by_cases h : j.val = 0
+      . simp [h]
+        have : j = ⟨ 0, by simp ⟩ := by rw [<- Fin.val_eq_val]; assumption
+        rw [this]
+        simp
+      . have : j ≠ ⟨ 0, by simp ⟩ := by unfold Ne; rw [<- Fin.val_eq_val]; exact h
+        obtain ⟨j', hj'⟩ := Fin.exists_succ_eq_of_ne_zero this
+        rw [<- hj']
+        simp
+        exact ih idx' j'
+
+
+
+/- ## List.inner_prod -/
 
 def List.inner_prod {α: Type} [Mul α] [Add α] [Zero α] (l : List α) (r : List α) : α :=
    List.sum (List.zipWith (fun x y => x * y) l r)
@@ -76,8 +135,6 @@ theorem List.inner_prod_indexed {α: Type} [Mul α] [AddCommMonoid α]
       rw [this]
       simp
 
-def List.zeros (len : Nat) : List Nat :=
-  List.replicate len 0
 
 theorem List.inner_prod_zeros_left {len : Nat} :
   ∀ (r : List Nat), List.inner_prod (List.zeros len) r = 0 := by
@@ -101,21 +158,25 @@ theorem List.inner_prod_zeros_left {len : Nat} :
       rw [this]
       simp
 
-def List.incrementNth (xs : List Nat) (idx : Nat) : List Nat :=
-  xs.modify (fun x => x + 1) idx
+theorem List.inner_prod_symmetric {l : List Nat} {r : List Nat} (h_len : l.length = r.length) :
+  List.inner_prod l r = List.inner_prod r l := by
+  rw [List.inner_prod_indexed l r h_len]
+  rw [List.inner_prod_indexed r l (by sorry)]
+  simp
+  conv =>
+    lhs
+    pattern fun _ => _ * _
+    intro i
+    rw [Nat.mul_comm]
 
-theorem List.incrementNth_length {xs : List Nat} (idx : Nat) :
-  (xs.incrementNth idx).length = xs.length :=
-  by
-    unfold List.incrementNth
-    apply List.length_modify
-
-
-theorem List.incrementNth_cons {x : Nat} {xs : List Nat} (idx : Nat) :
-  (x :: xs).incrementNth (idx + 1) = x :: xs.incrementNth idx := by
-    unfold List.incrementNth
-    unfold modify
-    simp
+  -- EXAMPLE: of how I just can't use l.length = r.length, and need to manually write an Eq.rec...
+  have := @Eq.rec _ _
+      (motive := fun ll (h : l.length = ll) ↦ ((@Finset.sum (Fin l.length) ℕ Nat.instAddCommMonoid Finset.univ fun i ↦ r[i.val] * l[i.val] : ℕ)
+                                              = (@Finset.sum (Fin ll) ℕ Nat.instAddCommMonoid Finset.univ fun i ↦ r[i.val] * l[i.val] : ℕ)))
+      (by
+        simp
+      ) r.length h_len
+  rw [this]
 
 
 lemma List_inner_prod_increment_left_head {x : Nat} {xs : List Nat} {y : Nat} {ys : List Nat} :

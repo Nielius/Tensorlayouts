@@ -7,6 +7,19 @@ import Mathlib.Data.Set.Basic
 import Mathlib.Logic.Basic
 import Mathlib.Algebra.Group.Nat.Defs
 
+@[simps! apply symm_apply]
+def IndexSet.cons_equiv {shapeHead : PosInt} {shapeTail : Shape} :
+  IndexSet (shapeHead :: shapeTail) ≃ IndexSet [shapeHead] × IndexSet shapeTail
+  where
+  /- TODO: define this with Subtype.map as well? -/
+  toFun := (Prod.map
+              (Subtype.map (fun idx => [idx.headD 0]) (by ))
+              (Subtype.map (fun idx => idx.tail) (by sorry)))
+              ∘ (fun x => (x, x))
+  invFun :=
+     fun (idxHead, idxTail) => ⟨idxHead.val.head (by sorry) :: idxTail.val, by sorry⟩
+  left_inv := by sorry
+  right_inv := by sorry
 
 
 /- ## Merging cons -/
