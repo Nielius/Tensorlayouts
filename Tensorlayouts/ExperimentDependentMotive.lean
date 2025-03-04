@@ -11,6 +11,7 @@ structure MyPair where
   n : Nat
   m : Nat
 
+
 /- This is exactly the problem I'm having! You suddenly can't use a subst anymore
 if a struct is involved! And you also can't use a rewrite, because if the dependent
 type. Very frustrating.-/
@@ -18,26 +19,19 @@ theorem test' (p1 : MyPair) (h1 h2 : p1.n = (0: Nat)) : F p1.n h1 = F p1.n h2 :=
   -- subst h1 -- doesn't work
   -- rw [h1] -- doesn't work
 
-  cases p1
-  rename_i n m
-  | mk n m =>
-    simp
-
-
+  -- Solution: use cases!
   cases p1 with
   | mk n m =>
     simp
 
+  -- alternative working proof (but it does something else!):
+  -- have h_eq : h1 = h2 := by
+  --   apply proof_irrel  -- Proofs of equalities in `Prop` are always equal
+  -- rw [h_eq]
 
 
 
-
-
-  -- working proof (but it does something else!):
-  have h_eq : h1 = h2 := by
-    apply proof_irrel  -- Proofs of equalities in `Prop` are always equal
-  rw [h_eq]
-
+-- see List.inner_prod_symmetric for an example of how I just can't use l.length = r.length, and need to manually write an Eq.rec...
 
 def PosInt := { n : Nat // n > 0 }
 
