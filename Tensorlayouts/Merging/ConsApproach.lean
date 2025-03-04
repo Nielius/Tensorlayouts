@@ -201,10 +201,7 @@ theorem View.compose_cons (v1 : View) (shape stride : PosInt) (v2 : View) (h: (c
     arg 1
     rw [this]
 
-  /- TODO GEBLEVEN
-  we basically need to show that to_unraveled_index_fn is additive
-  is it?
-  -/
+
 
   unfold View.to_unraveled_index_fn
   unfold unravel
@@ -249,15 +246,6 @@ theorem View.compose_cons (v1 : View) (shape stride : PosInt) (v2 : View) (h: (c
   sorry
 
 
-/-
- ## GEBLEVEN
-
-- zie de GEBLEVEN van boven
- - use the above theorem to make the proof of View.compose_cons_head/tail easier?
- - or: first prove the same thing for composition
- - then use that to prove the theorem for cons
-
--/
 
 
 theorem View.compose_cons (v1 : View) (shape stride : PosInt) (v2 : View) (h: (cons shape stride v2).max_index ≤ v1.shape.max_index) :
