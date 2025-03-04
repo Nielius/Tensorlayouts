@@ -269,7 +269,6 @@ def View.index_fn (v : View) : (IndexSet v.shape) -> NatLt v.max_index :=
   Subtype.map v.index_fn_inner (by
     intro idx hvalid
     unfold View.index_fn_inner
-    simp
     have hasdf : forall (n : Nat), n = v.shape.length -> (v.stride.inner_prod idx < v.max_index) := by
       -- introducing this is the only way I know of doing induction on n, while keeping the right hypotheses in the goal
       intro n hn
@@ -346,121 +345,30 @@ theorem View.from_single_dimension_index_fn_safe_linear (shape stride : PosInt) 
   rw [Nat.mul_comm]
 
 
--- set_option autoImplicit false
--- set_option pp.parens true
--- set_option pp.proofs true
--- set_option pp.fieldNotation false
-theorem View.index_fn_increment_eq_stride' (v: View) (j : Fin v.shape.length) (h : 1 < (v.shape.get j).val) :
-  (v.index_fn (IndexSet.fn_equiv.symm (incrementIndex (IndexFnSet.zero v.shape) j h))).val
+
+
+
+theorem View.index_fn_one_hot_eq_stride (v: View) (j : Fin v.shape.length) (h : 1 < (v.shape.get j).val) :
+  (v.index_fn (IndexSet.one_hot j h)).val
   = v.stride.get (Fin.cast v.lengthEq j) := by
   unfold View.index_fn
   unfold View.index_fn_inner
+  unfold Subtype.map
   simp
 
-  sorry -- TODO IMPORTANT
+  rw [IndexSet.one_hot_val]
+  rw [List.inner_prod_symmetric]
 
-  have h_stride_len : (IndexSet.fn_equiv.symm (incrementIndex (IndexFnSet.zero v.shape) j h)).val.length = List.length v.stride :=
-    by
-    rw [IndexSet.fn_equiv_symm_val_length]
-    rw [v.lengthEq]
+  have := List.inner_prod_one_hot v.stride (Fin.cast v.lengthEq j)
+  simp at this
+  rw [<- this]
 
-  rw [List.inner_prod_symmetric h_stride_len.symm]
-  rw [List.inner_prod_indexed (h_len := h_stride_len)]
-
-
-
-
-  have := List.get_eq_getElem (IndexSet.fn_equiv.symm (incrementIndex (IndexFnSet.zero v.shape) j h)).val
+  apply congrArg (fun (x : List Nat) => x.inner_prod v.stride)
+  rw [List.one_hot_eq_iff_len_eq]
   simp
-  conv =>
-    lhs
-    pattern fun _ => _
-    intro i
-    enter [1]
-    rw [<- this i]
-    rw [IndexSet.fn_equiv_symm_of_increment']
-    simp
-
-  -- -- now let's do a small rewrite to make it easier to apply Fintype.sum_ite_eq
-  have hlen : (IndexSet.fn_equiv.symm (incrementIndex (IndexFnSet.zero v.shape) j h)).val.length = v.shape.length := by
-    rw [IndexSet.fn_equiv_symm_val_length]
-
-  have h_valid_index :  ∀ (i : Fin ((IndexSet.fn_equiv.symm (incrementIndex (IndexFnSet.zero v.shape) j h)).val).length),
-    i < v.stride.length := by
-    intro i
-    rw [<- h_stride_len]
-    exact i.is_lt
-
-  have : j.val = (⟨j.val, by rw [hlen]; exact j.is_lt⟩ : Fin ((IndexSet.fn_equiv.symm (incrementIndex (IndexFnSet.zero v.shape) j h)).val.length)).val := by simp
-
-  conv =>
-    lhs
-    pattern fun _ => _
-    intro i
-    enter [1, 1]
-    rw [this]
-    rw [Fin.val_eq_val]
-
-
-  conv =>
-    lhs
-    pattern fun _ => _
-    intro i
-    rw [ite_mul]
-
+  exact v.lengthEq
   simp
-
-
-theorem View.index_fn_increment_eq_stride (v: View) (j : Fin v.shape.length) (h : 1 < (v.shape.get j).val) :
-  (v.index_fn (IndexSet.fn_equiv.symm (incrementIndex (IndexFnSet.zero v.shape) j h))).val
-  = v.stride.get (Fin.cast v.lengthEq j) := by
-  unfold View.index_fn
-  unfold View.index_fn_inner
-  simp
-
-  have h_stride_len : (IndexSet.fn_equiv.symm (incrementIndex (IndexFnSet.zero v.shape) j h)).val.length = List.length v.stride :=
-    by
-    rw [IndexSet.fn_equiv_symm_val_length]
-    rw [v.lengthEq]
-
-  rw [List.inner_prod_symmetric h_stride_len.symm]
-  rw [List.inner_prod_indexed (h_len := h_stride_len)]
-
-  have := List.get_eq_getElem (IndexSet.fn_equiv.symm (incrementIndex (IndexFnSet.zero v.shape) j h)).val
-  simp
-  conv =>
-    lhs
-    pattern fun _ => _
-    intro i
-    enter [1]
-    rw [<- this i]
-    rw [IndexSet.fn_equiv_symm_of_increment']
-    simp
-
-
-  -- now let's do a small rewrite to make it easier to apply Fintype.sum_ite_eq
-  have hlen : (IndexSet.fn_equiv.symm (incrementIndex (IndexFnSet.zero v.shape) j h)).val.length = v.shape.length := by
-    rw [IndexSet.fn_equiv_symm_val_length]
-
-  have : j.val = (⟨j.val, by rw [hlen]; exact j.is_lt⟩ : Fin ((IndexSet.fn_equiv.symm (incrementIndex (IndexFnSet.zero v.shape) j h)).val.length)).val := by simp
-
-  conv =>
-    lhs
-    pattern fun _ => _
-    intro i
-    enter [1, 1]
-    rw [this]
-    rw [Fin.val_eq_val]
-
-  conv =>
-    lhs
-    pattern fun _ => _
-    intro i
-    rw [ite_mul]
-    simp
-
-  rw [Fintype.sum_ite_eq']
-
+  exact v.lengthEq.symm
 
 
 theorem View.index_fn_is_linear (v: View) (i : IndexFnSet v.shape) (j : Fin v.shape.length) (h : i.val j + 1 < v.shape.get j) :
@@ -471,13 +379,14 @@ theorem View.index_fn_is_linear (v: View) (i : IndexFnSet v.shape) (j : Fin v.sh
         apply Nat.lt_of_le_of_lt (m := i.val j + 1)
         . apply Nat.le_add_left (m := i.val j)
         . assumption
-      rw [<- IndexFnSet.zero_equiv]
+      simp
       exact this
     )))).val := by
   unfold View.index_fn
   simp
   unfold View.index_fn_inner
-  simp
+  -- TODO important
+  sorry
 
 
 
@@ -502,10 +411,6 @@ theorem View.from_linear_function_shape_eq (f : LinearIntegerFunc) :
   unfold View.from_linear_function
   unfold View.from_single_dimension
   simp
-
-
-
-
 
 
 

@@ -322,17 +322,59 @@ theorem IndexSet.incrementNth_val_length_eq {s : Shape} (i : IndexSet s) (j : Fi
   unfold IndexSet.incrementNth
   simp only [List.incrementNth_length, val_length]
 
-theorem IndexSet.incrementNth_ite {s : Shape} (i : IndexSet s) (j : Fin s.length) (h : i.val[j] + 1 < s.get j)
+@[simp]
+theorem IndexSet.incrementNth_val_eq {s : Shape} (i : IndexSet s) (j : Fin s.length) (h : i.val[j] + 1 < s.get j) :
+  (i.incrementNth j h).val = i.val.incrementNth j := by
+  unfold IndexSet.incrementNth
+  simp only [List.incrementNth_length, val_length]
+
+theorem IndexSet.incrementNth_ite_val_switched {s : Shape} (i : IndexSet s) (j : Fin s.length) (h : i.val[j] + 1 < s.get j)
   (k : Fin (i.incrementNth j h).val.length)
   : (i.incrementNth j h).val.get k =
-       let k' := Fin.cast (by apply i.incrementNth_val_length_eq) k
-       if k.val = j.val then i.val.get k' + 1 else i.val.get k' := by
+       if k.val = j.val then i.val.get (Fin.cast (by apply i.incrementNth_val_length_eq) k) + 1 else i.val.get (Fin.cast (by apply i.incrementNth_val_length_eq) k) := by
   unfold IndexSet.incrementNth
   simp
   have := (i.val).incrementNth_ite (j.val) (Fin.cast (by apply i.incrementNth_val_length_eq) k)
   unfold Fin.cast at this
   simp at this
   rw [this]
+
+theorem IndexSet.incrementNth_ite {s : Shape} (i : IndexSet s) (j : Fin s.length) (h : i.val[j] + 1 < s.get j)
+  (k : Fin (i.incrementNth j h).val.length)
+  : (i.val.incrementNth j).get k =
+       if k.val = j.val then i.val.get (Fin.cast (by apply i.incrementNth_val_length_eq) k) + 1 else i.val.get (Fin.cast (by apply i.incrementNth_val_length_eq) k) := by
+  unfold IndexSet.incrementNth
+  simp
+  have := (i.val).incrementNth_ite (j.val) (Fin.cast (by apply i.incrementNth_val_length_eq) k)
+  unfold Fin.cast at this
+  simp at this
+  rw [this]
+
+def IndexSet.one_hot {s : Shape}  (j : Fin s.length) (h : 1 < (s.get j).val) : IndexSet s :=
+  IndexSet.incrementNth (IndexSet.zero s) j (by simp; exact h)
+
+theorem IndexSet.one_hot_val {s : Shape} (j : Fin s.length) (h : 1 < (s.get j).val) :
+  (IndexSet.one_hot j h).val = List.one_hot s.length j := by
+  unfold IndexSet.one_hot
+  unfold IndexSet.incrementNth
+  simp
+  apply List.ext_get
+  simp
+
+  intro i hi hi2
+  rw [IndexSet.incrementNth_ite]
+  unfold List.one_hot
+  have := List.incrementNth_ite (List.zeros s.length) j ⟨ i, by simp; simp at hi2; exact hi2 ⟩
+  simp
+  simp at this
+  rw [this]
+  unfold List.zeros
+  simp
+
+  simp [IndexSet.zero, List.one_hot, List.zeros]
+  simp
+  assumption
+
 
 theorem Shape.max_index_tail : ∀ (s : Shape) (s' : PosInt),
   Shape.max_index (s' :: s) = s' * Shape.max_index s := by
@@ -446,6 +488,8 @@ theorem incrementIndex_fn_equiv {s : Shape} (i : IndexFnSet s) (j : Fin s.length
   . intro n hn hn2
     rw [IndexSet.incrementNth_ite (IndexSet.fn_equiv.symm i) j]
     simp [IndexSet.fn_equiv]
+    rw [IndexSet.fn_equiv_symm_val_getElem]
+    assumption
 
 
 def IndexFnSet.zero (s : Shape) : IndexFnSet s :=

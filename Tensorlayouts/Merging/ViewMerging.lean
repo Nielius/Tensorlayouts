@@ -153,7 +153,13 @@ theorem mergeability_criterion (v1 v2: View) :
 
   simp at h_shape_at_least_2
   simp [h_shape_at_least_2]
-  rfl
+  unfold IndexSet.fn_equiv
+  simp
+  unfold i_zero_fn
+  unfold i_zero
+  unfold IndexSet.zero
+  unfold IndexSet.fn_equiv
+  simp
 
   -- other direction
   intro h_increment_criterion

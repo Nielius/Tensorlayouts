@@ -35,8 +35,13 @@ This is
 - [ ] incorporate offsets and masks
 - [ ] include theorem on merging more than 2 views (I think the statement will be basically the same: the composition of all functions should still satisfy the requirement when you increase an index component) 
 - possible refactors
+  - [ ] (small) get rid of Experiments.ExperimentFunCast (imported in 2 places, but I don't think it needs to be)
   - [ ] use `Fin` from `Mathlib.Data.Fin.Basic` instead of `NatLt`; it is basically the same
   - [ ] maybe use `Fin n \to Nat` for indices, rather than lists? We're now using both
 
 - how should you use the equivalence? should you use `.toFun` and `.invFun`? I think you probably shouldn't, but sometimes `simp` produces it, and then it's difficult to get rid of, making rewrites that don't involve `.toFun`/`.invFun` difficult
   - I think I should try to stick to the version without `.toFun` and `.invFun`
+
+## Development
+
+No CI for now. Run `lake build` to check yourself.

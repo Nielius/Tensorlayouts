@@ -19,6 +19,10 @@ theorem Nat.prod_cons : Nat.prod (a :: l) = a * Nat.prod l := by
 def List.zeros (len : Nat) : List Nat :=
   List.replicate len 0
 
+@[simp]
+def List.zeros_length {len : Nat} : (List.zeros len).length = len := by
+  simp [List.zeros]
+
 /- ## List.incrementNth -/
 
 def List.incrementNth (xs : List Nat) (idx : Nat) : List Nat :=
@@ -72,6 +76,26 @@ theorem List.incrementNth_ite (xs : List Nat) (idx : Nat) (j : Fin xs.length) :
         simp
         exact ih idx' j'
 
+def List.one_hot (len : Nat) (j : Fin len) : List Nat :=
+  List.incrementNth (List.zeros len) j
+
+@[simp]
+theorem List.one_hot_length {len : Nat} (j : Fin len) :
+  (List.one_hot len j).length = len := by
+  simp [List.one_hot]
+
+theorem List.one_hot_eq_iff_len_eq (len len' : Nat) (j : Fin len) (j' : Fin len') :
+  List.one_hot len j = List.one_hot len' j' <->
+  (len = len' ∧ j.val = j'.val) := by
+  sorry
+  -- constructor
+  -- . intro h
+  --   simp at h
+  --   rw [List.one_hot_val]
+  --   rw [List.one_hot_val]
+  --   simp at h
+
+  -- List.incrementNth (List.zeros len) j
 
 
 /- ## List.inner_prod -/
@@ -187,15 +211,14 @@ lemma List_inner_prod_increment_left_head {x : Nat} {xs : List Nat} {y : Nat} {y
 
 
 theorem List.inner_prod_increment_left {xs : List Nat} {ys : List Nat} (h_len : xs.length = ys.length) :
-  ∀ (idx : Fin xs.length), List.inner_prod (xs.incrementNth idx) ys = List.inner_prod xs ys + ys[idx] := by
+  ∀ (idx : Nat) (h_idx : idx < xs.length), List.inner_prod (xs.incrementNth idx) ys = List.inner_prod xs ys + ys[idx] := by
   induction xs generalizing ys
   case nil =>
-    intros idx
+    intros idx h_idx
     -- Since xs is empty, xs.length = 0, so there is no element of type Fin xs.length.
-    apply Fin.elim0
-    assumption
+    simp at h_idx
   case cons x xs ih =>
-    intros idx
+    intros idx h_idx
     cases ys with
     | nil =>
       simp at h_len
@@ -203,9 +226,8 @@ theorem List.inner_prod_increment_left {xs : List Nat} {ys : List Nat} (h_len : 
       -- Since (x :: xs).length = (y :: ys').length, we have xs.length = ys'.length.
       have h_len' : xs.length = ys'.length := by exact Nat.succ_inj'.mp h_len
       -- Now do a case analysis on idx.
-      rcases idx with ⟨k, hk⟩
-      simp
-      cases k with
+
+      cases idx with
       | zero =>
         simp
         unfold List.incrementNth
@@ -216,7 +238,7 @@ theorem List.inner_prod_increment_left {xs : List Nat} {ys : List Nat} (h_len : 
         simp
         rw [List.incrementNth_cons]
         rw [List.inner_prod_cons]
-        let k'fin : Fin (xs.length) := ⟨k', by simp at hk; exact hk ⟩
+        let k'fin : Fin (xs.length) := ⟨k', by simp at h_idx; exact h_idx ⟩
         have : k' = k'fin.val := by unfold k'fin; simp
         conv =>
           lhs
@@ -225,9 +247,19 @@ theorem List.inner_prod_increment_left {xs : List Nat} {ys : List Nat} (h_len : 
         conv =>
           rhs
           rw [List.inner_prod_cons]
-        simp
         rw [Nat.add_assoc]
         assumption
+        exact k'fin.is_lt
+
+
+theorem List.inner_prod_one_hot (xs : List Nat) (j : Fin xs.length) :
+  List.inner_prod (List.one_hot xs.length j) xs = xs[j] := by
+  unfold List.one_hot
+  rw [List.inner_prod_increment_left]
+  simp
+  apply List.inner_prod_zeros_left
+  simp
+  simp
 
 
 /-- ## PosInt -/

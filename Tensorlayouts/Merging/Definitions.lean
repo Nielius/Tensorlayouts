@@ -1,5 +1,5 @@
 import Tensorlayouts.Shape
-import Tensorlayouts.ExperimentFunCast
+import Tensorlayouts.Experiments.ExperimentFunCast
 import Tensorlayouts.View
 
 
