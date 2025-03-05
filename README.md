@@ -56,6 +56,7 @@ Some remarks on this statement:
 
 ## Next steps and todos
 
+- [ ] write up the formalization in [this markdown file](doc/problem-formalization.md)
 - [ ] fill in all the gaps (there are some `sorry`s left)
 - [ ] incorporate offsets and masks
 - [ ] include theorem on merging more than 2 views (I think the statement will be basically the same: the composition of all functions should still satisfy the requirement when you increase an index component) 
