@@ -1,0 +1,342 @@
+\documentclass{article}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{hyperref}
+\usepackage{cleveref}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{lemma}[theorem]{Lemma}
+\theoremstyle{definition} % Switch to definition style (no italics)
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{remark}[theorem]{Remark}
+
+\newcommand{\bN}{\mathbb{N}}
+\newcommand{\defn}[1]{\textit{#1}}
+
+\title{Merging tensor views}
+\author{Niels uit de Bos}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+This document contains a formalization of the concept of merging tensor views.
+We prove a simple criterion for when two tensor views can be merged into a single view without changing the underlying memory layout:
+the main result (\cref{thm:main-theorem}) gives necessary and sufficient conditions for when two views can be merged, based on checking additivity conditions of the composed index functions.
+A worked out example in \cref{sec:worked_out_example} illustrates why these conditions are necessary and cannot be simplified further.
+
+The code and formal proofs in the Lean theorem prover are available at \url{https://github.com/nielius/tensorlayouts}.
+
+\section{Views}
+\label{sec:views}
+
+\begin{definition}
+    A \defn{view} is a tuple $(s, \sigma)$ of a shape $s = (s_1, \ldots, s_k)$, $s_i \in \mathbb{N_{\geq 2}}$, 
+    and a tuple of strides $\sigma = (\sigma_1, \ldots, \sigma_k)$, $\sigma_i \in \mathbb{N}$.
+\end{definition}
+
+Note that we only consider sizes $\geq 2$: a size of 1 or 0 is empty and can be ignored.
+
+\begin{definition}
+  The \defn{index set} of a shape $s = (s_1, \ldots, s_k) \in \bN^k$ is the set
+  \[
+    I_s = \{(i_1, \ldots, i_k) \in \bN^k: \forall 1 \leq \ell \leq k, 0 \leq i_\ell < s_\ell \}.
+  \]
+\end{definition}
+
+\begin{definition}
+  \label{def:index-function}
+  The \defn{index function} of a view $v = (s, \sigma)$ is the function
+  \[
+    v \colon I_s \to \bN, \quad (i_1, \ldots, i_k) \mapsto \sum_\ell i_\ell \sigma_\ell.
+  \]
+  Note that we abuse notation: we use the same symbol $v$ for the view and the index function.
+\end{definition}
+
+The additivity of the inner product in the definition above gives us the following lemma.
+\begin{lemma}
+  \label{lem:index-function-additive}
+  Let $v = (s, \sigma)$ be a view.
+  Then $v$ is additive in $I_s$, i.e.,
+  \[
+    v(i + i') = v(i) + v(i') \quad \text{for all $i, i' \in I_s$ with $i + i' \in I_s$}.
+  \]
+\end{lemma}
+
+
+\begin{definition}
+  Let $s = (s_1, \ldots, s_k)$ be a shape.
+  The \defn{contiguous view} for $s$ is the view $v^s = (s, \sigma^s)$, where
+  \[
+    \sigma^s_j = \prod_{\ell=j+1}^{k} s_\ell.
+  \]
+\end{definition}
+This is the standard row-major view that a tensor of shape $s$ has.
+
+
+The interpretation of these views is as follows:
+with respect to some given contiguous and linear array of data $d$,
+a view $v = (s, \sigma)$ represents a tensor of shape $s$, with the coordinate $[i_1, \ldots, i_k]$ corresponding to the data point 
+  $d\left[ v(i_1, \ldots, i_k) \right] = d\left[ \sum_j i_j \sigma_j \right]$.
+
+\section{Merging Views}
+
+\begin{definition}
+  \label{def:functional-composition}
+  Let $v_1 = (s_1, \sigma_1), v_2 = (s_2, \sigma_2)$ be views.
+  We define the \defn{functional composition} of $v_1$ and $v_2$ as the function
+  \[
+    f_{v_1, v_2} := v_1 \circ (v^{s_1})^{-1} \circ v_2 \colon I_{s_2} \to \bN.
+  \]
+\end{definition}
+
+\begin{remark}
+  \label{rem:unraveling}
+  For a view $v = (s, \sigma)$,
+  the function $(v^s)^{-1}$ is also known as the \defn{unraveling} function:
+  it takes a natural number $i$ and interprets it as an index of a tensor of shape $s$,
+  where the tensor layout is assumed to be row-major, i.e., the standard contiguous layout.
+  We need to insert this unraveling function in the definition of the functional composition,
+  because we want to think of $v_2$ as a view into a tensor of shape $s_1$,
+  but $v_2$ as defined so far is a function $I_{s_2} \to \bN$.
+\end{remark}
+
+\begin{definition}
+  \label{def:merged-view}
+  Let $v_1 = (s_1, \sigma_1), v_2 = (s_2, \sigma_2), v = (s, \sigma)$ be views.
+  We say that $v$ is the \defn{merged view} of $v_1$ and $v_2$ if
+  \[
+    v = f_{v_1, v_2}
+  \]
+  as functions $I_{s_2} \to \bN$. (Note that this implies $s = s_2$.)
+\end{definition}
+
+\begin{definition}
+  \label{def:mergeable}
+  Let $v_1 = (s_1, \sigma_1), v_2 = (s_2, \sigma_2), v = (s, \sigma)$ be views.
+  We say that $(v_1, v_2)$ is \defn{mergeable} or \defn{can be merged}
+  if there exists a view $v$ such that $v$ is the merged view of $v_1$ and $v_2$.
+\end{definition}
+
+The main result of this paper is necessary and sufficient conditions for two views to be mergeable.
+
+\section{Main result}
+
+Let $v = (s = (s_1, \ldots, s_k), \sigma = (\sigma_1, \ldots, \sigma_k))$ be a view
+and let $1 \leq j \leq k$ be an integer.
+We will denote by $e_j = (0, \ldots, 0, 1, 0, \ldots, 0) \in \bN^k$ the vector with a $1$ in the $j$-th position and $0$ elsewhere.
+We can add $e_j$ to an index $i \in I_s$ if $i_j + 1 < s_j$; this gives us an index $i + e_j \in I_s$.
+
+We recall (\cref{def:functional-composition})
+that for views $v, v'$, we denote the functional composition of those views by $f_{v, v'}$;
+$(v, v')$ is defined to be mergeable (\cref{def:mergeable}) if there exists a view $\tilde v$
+such that the index function of $\tilde v$ (\cref{def:index-function}; abusing notation to also
+denote this index function by $\tilde v$) 
+is equal to $f_{v, v'}$.
+\begin{theorem}
+  \label{thm:main-theorem}
+  Let $v = (s = (s_1, \ldots, s_k), \sigma = (\sigma_1, \ldots, \sigma_k))$
+  and $v' = (s' = (s_1, \ldots, s_\ell), \sigma' = (\sigma_1', \ldots, \sigma_\ell'))$
+  be views.
+  Then $(v, v')$ is mergeable if and only if 
+  for all $i \in I_{s'}$ and all $1 \leq j \leq \ell'$ such that $i_j + 1 < s'_j$,
+  we have
+  \[
+    f_{v, v'}(i + e_j) = f_{v, v'}(i) + f_{v, v'}(e_j).
+  \]
+  If $(v, v')$ is mergeable, then the merged view $\tilde v$ is unique and equal to
+  \[
+    \tilde v = (s', (\tilde \sigma_1, \ldots, \tilde \sigma_\ell)), \quad \text{where} \quad 
+    \tilde \sigma_j = f_{v, v'}(e_j).
+  \]
+\end{theorem}
+A Lean formalization of this theorem is available at \url{https://github.com/nielius/tensorlayouts}.
+
+\begin{remark}
+  This theorem on its own is not very surprising.
+  Perhaps it is more interesting to note that this can not be simplified further,
+  and that you actually need to check the conditions for all $i \in I_{s'}$ and all $1 \leq j \leq \ell'$ such that $i_j + 1 < s'_j$.
+  This is made clearer by the example in \cref{sec:worked_out_example}.
+\end{remark}
+
+\begin{remark}
+  The criterion given in \cref{thm:main-theorem} is easy to check computationally,
+  although it involves checking a large number of conditions.
+\end{remark}
+
+\begin{proof}[Proof of \cref{thm:main-theorem}]
+  ($\Rightarrow$)
+  Assume that $(v, v')$ is mergeable, i.e.,
+  there exists a view $\tilde v = (s', \tilde \sigma)$ such that $\tilde v = f_{v, v'}$.
+  \Cref{lem:index-function-additive} shows that $\tilde v$ is additive in $I_{s'}$,
+  so in particular, we have the given condition.
+
+  ($\Leftarrow$)
+  Define $\tilde \sigma = (\tilde \sigma_1, \ldots, \tilde \sigma_\ell)$ by
+  $\tilde \sigma_j = f_{v, v'}(e_j)$.
+  We can now show $\tilde v = f_{v, v'}$ by induction:
+  \begin{itemize}
+    \item $\tilde v(0) = 0$ and $f_{v, v'}(0) = 0$ are clear.
+    \item
+      Assume that $\tilde v(i) = f_{v, v'}(i)$ for all $i \in I_{s'}$
+      with $\sum_j i_j \leq K$ for some given $K$. (The base case is $K = 0$,
+      which we remarked on above.)
+      Any index $i' \in I_{s'}$ with $\sum_j i'_j = K + 1$
+      can be written as $i' = i + e_j$ for some $i \in I_{s'}$ with $\sum_{j'} i_{j'} = K$ and $1 \leq j \leq \ell'$.
+      Then we have
+      \begin{align*}
+          f_{v, v'}(i') 
+          &= f_{v, v'}(i + e_j) = f_{v, v'}(i) + f_{v, v'}(e_j) && \text{by assumption} \\
+           &= \tilde v(i) + \tilde v(e_j) && \text{by the induction hypothesis} \\
+           &= \tilde v(i') && \text{by \cref{lem:index-function-additive}}
+      \end{align*}
+  \end{itemize}
+
+  This shows that $\tilde v = f_{v, v'}$, completing the proof.
+\end{proof}
+
+\section{Example: Checking mergeability through overflows}
+\label{sec:worked_out_example}
+
+Let
+\begin{align*}
+  v &= ((10, 3, 3), (\sigma_1, \sigma_2, \sigma_3)) && \quad \text{(where $\sigma_1, \sigma_2, \sigma_3 \in \bN$)} \\
+  v' &= ((s), (4)) &&\quad \text{(where $s \in \bN$)}
+\end{align*}
+be two views.
+(Note that the shape of $v'$ is $(s)$, i.e., it is a one-dimensional shape.)
+In this example,
+we will check our main criterion (\cref{thm:main-theorem})
+to see for which values of $s$ and $\sigma_1, \sigma_2, \sigma_3$
+the views $(v, v')$ are mergeable.
+This is a relatively simple example, because $v'$ is one-dimensional,
+but it shows the main problems you encounter.
+
+We will see that $(v, v')$ is mergeable if $s \leq 4$ and $\sigma_1 = 2 \sigma_2 + 3 \sigma_3$ hold.
+However, if $s > 4$, then for $(v, v')$ to be mergeable, we additionally require that $\sigma_1 = 3 \sigma_2$ holds.
+This shows that 
+this problem is not simply a linear algebra problem,
+and the only way to determine the necessary conditions is to iterate over indices and analyze the overflow structure.
+The reason for this, as we will see, is that for $s > 4$, we have an additional overflow condition that needs to be checked.
+
+This is the approach we are going to take.
+By definition, $(v, v')$ can be merged if the functional composition
+\[
+    f_{v, v'} = v \circ (v^{(10, 3, 3)})^{-1} \circ v'
+\]
+is equal to some view $\tilde v = (s, \tilde \sigma)$.
+The main criterion (\cref{thm:main-theorem}) says that for $(v, v')$ to be mergeable, there has to be a $\tilde \sigma$ such that
+\begin{equation}
+  \label{eq:main-criterion-for-example}
+    f_{v, v'}(i + 1) = f_{v, v'}(i) + \tilde \sigma, \qquad \text{or equivalently} \quad
+    f_{v, v'}(i + 1) - f_{v, v'}(i) = \tilde \sigma.
+\end{equation}
+for all $0 \leq i < s - 1$.
+To check this, we will simply evaluate $f_{v, v'}(i)$ for all $i \in I_{(s)} = \{0, \ldots, s-1\}$,
+and note down the equation $f_{v, v'}(i + 1) - f_{v, v'}(i) = \tilde \sigma$ that we get.
+
+\subsection{Case $s = 4$}
+
+Proceeding as described above, we get the following table.
+Let's write out the steps for $i = 1$ as an example.
+We have $v'(1) = 4 \cdot 1 = 4$ (because the stride of $v'$ is $4$).
+The unraveling of $4$ in the shape $(10, 3, 3)$ is $(0, 1, 1)$ (the easiest way to do this is to realize
+that the unravel function is like arithmetic in \href{https://en.wikipedia.org/wiki/Mixed_radix}{a mixed radix system}),
+so $((v^{(10, 3, 3)})^{-1} \circ v')(1) = (0, 1, 1)$.
+Lastly, we have $f_{v, v'}(1) = v(0, 1, 1) = 0 \cdot \sigma_1 + 1 \cdot \sigma_2 + 1 \cdot \sigma_3 = \sigma_2 + \sigma_3$
+Since $f_{v, v'}(0) = 0$, we get the equation
+\[
+  \sigma_2 + \sigma_3 = \tilde \sigma.
+\]
+This is what we show in the row $i = 1$ of the table.
+The calculations for the other rows are similar.
+
+\begin{table}[h]
+    \centering
+    \begin{tabular}{c|c|c|c|c}
+        $i$ & $i_1$ & $i_2$ & $i_3$ & Equation \\
+        \hline
+        0  &  0  & 0  & 0  &  \\
+        1  &  0  & 1  & 1  &  $\tilde \sigma = \sigma_2 + \sigma_3$  \\
+        2  &  0  & 2  & 2  &  $\tilde \sigma = \sigma_2 + \sigma_3$  \\
+        3  &  1  & 1  & 0  &  $\sigma_1 + \sigma_2 = 2 \sigma_2 + 2 \sigma_3 + \tilde \sigma$  \\
+    \end{tabular}
+    \caption{Overflow equations for $s=4$. For every value of $i$, we calculate
+    $(i_1, i_2, i_3) = ((v^{(10, 3, 3)})^{-1} \circ v')(i)$; these 
+    are the coordinates in the tensor $v$ that correspond to the index $i$ in the tensor $v'$.
+    The last column, labelled with Equation, shows the equation we get from the main criterion (\cref{eq:main-criterion-for-example}).
+    }
+\end{table}
+
+The most interesting row is the last one:
+it is where index $i_2$ overflows into index $i_1$, and index $i_3$ overflows into index $i_2$.
+As a result of this, we get a different equation than for the other rows.
+(This is a general phenomenon: every overflow gives you a new equation, and the precise equation depends only on which indices overflowed.)
+From the last row, we obtain the equation $\sigma_1 = 2\sigma_2 + 3\sigma_3$.
+Solving these equations shows that $(v, v')$ is mergeable if and only if $\sigma_1 = 2\sigma_2 + 3\sigma_3$.
+The merged view is then equal to $((4), (\sigma_2 + \sigma_3))$.
+
+\subsection{Case $s = 6$}
+
+Now consider $s = 6$. We get the following equations:
+
+\begin{table}[h]
+    \centering
+    \begin{tabular}{c|c|c|c|c}
+        $i$ & $i_1$ & $i_2$ & $i_3$ & Equation \\
+        \hline
+        0  &  0  & 0  & 0  &  \\
+        1  &  0  & 1  & 1  &  $\tilde \sigma = \sigma_2 + \sigma_3$  \\
+        2  &  0  & 2  & 2  &  $\tilde \sigma = \sigma_2 + \sigma_3$  \\
+        3  &  1  & 1  & 0  &  $\sigma_1 + \sigma_2 = 2 \sigma_2 + 2 \sigma_3 + \tilde \sigma$  \\
+        4  &  1  & 2  & 1  &  $\tilde \sigma = \sigma_2 + \sigma_3$  \\
+        5  &  2  & 0  & 2  &  $2\sigma_1 + 2\sigma_3 = \sigma_1 + 2\sigma_2 + \sigma_3 + \tilde \sigma$  \\
+    \end{tabular}
+    \caption{Overflow equations for $s=6$}
+\end{table}
+
+The additional equation $2\sigma_1 + 2\sigma_3 = \sigma_1 + 2\sigma_2 + \sigma_3 + \sigma$ simplifies to $\sigma_1 = 3 \sigma_2$.
+Thus, in the case $s = 6$, $(v, v')$ is be mergeable if and only if $\sigma_1 = 3\sigma_2$ and $\sigma_1 = 2\sigma_2 + 3\sigma_3$ hold.
+We can rewrite these two equations to $\sigma_1 = 3\sigma_2$ and $\sigma_2 = 3\sigma_3$.
+
+\subsection{Observations}
+
+The most important conclusion from this example
+is that it is not enough to have some linear algebraic condition on the strides.
+The mergeability depends on the precise overflow structure,
+which in turn depends on the shape of the view.
+Bigger shapes are likely to encounter more overflows: as an extreme case,
+$(v, v')$ is always mergeable if $v'$ has shape $(2)$.
+
+\begin{itemize}
+  \item The generic case involves only a single overflow, while a double overflow imposes additional constraints.
+  \item If all single overflows satisfy the required conditions, then more complex overflows will automatically hold.
+  \item Overflows correspond to linear equations that must be checked to determine mergeability.
+  \item This calculation is akin to arithmetic overflow in numeral systems, but generalized to mixed-radix numbering where each index position has a different base given by the shape.
+\end{itemize}
+
+This demonstrates that the only way to determine the necessary conditions is to iterate over indices and analyze the overflow structure.
+
+If anyone knows of an efficient method to calculate which overflows will occur, please send me a message.
+
+\section{Other results}
+
+NOTE: THIS SECTION IS A DRAFT
+
+\begin{itemize}
+  \item The unraveling function (as defined in \cref{rem:unraveling}) $(v^s)^{-1}$
+    for a shape $s$ is the function that sends a natural number $i \in \bN$
+    to its representation in a \href{https://en.wikipedia.org/wiki/Mixed_radix}{mixed radix} numerical system.
+    For example, if $s = (2, 3, 4)$, then $(v^s)^{-1}(5) = (0, 1, 1)$.
+  \item In the main criterion (\cref{thm:main-theorem}),
+    instead of checking all possible increments, you could check only the increments
+    that lead to overflows (in the mixed radix arithmetic).
+    Every overflow gives a linear equation in the strides of the first view in the merge.
+    This equation only depends on the index components that are involved in the overflow.
+    Potentially, you could use this to check fewer conditions.
+\end{itemize}
+
+\end{document}

@@ -1,5 +1,8 @@
 # Example: checking mergeability through overflows
 
+(Note: this example also appears in [this pdf](paper/main.pdf).
+If you are used to reading mathematical papers, that pdf is probably better for you than this markdown note.)
+
 Suppose that $v_1$ is a view with shape
 $(10, 3, 3)$ and strides $(\sigma_1, \sigma_2, \sigma_3)$
 and we want to merge it with a view $v_2$ with shape $(s)$ and stride $(4)$;

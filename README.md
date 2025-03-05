@@ -1,7 +1,10 @@
 # Merging tensor layouts
 
 This repo contains a formal Lean proof of necessary and sufficients conditions for
-two tensor views (shade + stride) to be mergeable. See [this note](doc/problem-formalization.md) for a formal description of this problem, and see [the motivation section](#motivation) for a more intuitive description and information on why we care.
+two tensor views (shade + stride) to be mergeable.
+See [this note](doc/problem-formalization.md) for a formal description of this problem, and see [the motivation section](#motivation) for a more intuitive description and information on why we care.
+[This pdf](paper/main.pdf) lays out all the mathematical definitions,
+and has a proof and an example.
 
 Inspired by a [tinygrad](https://github.com/tinygrad/tinygrad) [bounty](https://github.com/tinygrad/tinygrad/issues/1641).
 
@@ -26,7 +29,11 @@ or [this other blog post](https://martinlwx.github.io/en/how-to-reprensent-a-ten
 
 ## Statement
 
-This main statement is the theorem `mergeability_criterion` in [`Tensorlayouts.Merging.ViewMerging`](Tensorlayouts/Merging/ViewMerging.lean):
+For a mathematical treatment, see [this pdf](paper/main.pdf), which has all the definitions, the proofs, and a worked-out example.
+That is probably the best place to look if you only care about the mathematics, and not the Lean formalization.
+
+In the Lean code,
+the main statement is the theorem `mergeability_criterion` in [`Tensorlayouts.Merging.ViewMerging`](Tensorlayouts/Merging/ViewMerging.lean):
 
 ```lean
 theorem mergeability_criterion (v1 v2: View) :
@@ -60,15 +67,6 @@ Some remarks on this statement:
 - lots of checking. From what I can tell, you can try to be smart about not checking everything, but it's quite difficult
 
 
-## Plans
-
-- special cases of merges
-  - if left view is simply canonical view for shape
-  - reshapes
-    - what does it mean? (define it as a function; both safe and unsafe function)
-    - when is it possible? (something about shapes, divisors, etc.)
-
-
 ## Next steps and todos
 
 - [ ] use Lean's auto-generated docs
@@ -76,16 +74,15 @@ Some remarks on this statement:
 - [ ] incorporate offsets and masks
 - [ ] include theorem on merging more than 2 views (I think the statement will be basically the same: the composition of all functions should still satisfy the requirement when you increase an index component) 
 - [ ] add test to tinygrad repo that checks ["accidental mergeability" like this](doc/example-accidental-mergeability.md) .
-- possible refactors
+ 
+Refactors:
 
-  - [ ] use either `IndexSet` or `IndexFnSet`, but not both. E.g. the main theorem uses both...
-  - [ ] (small) get rid of Experiments.ExperimentFunCast (imported in 2 places, but I don't think it needs to be)
-  - [ ] use `Fin` from `Mathlib.Data.Fin.Basic` instead of `NatLt`; it is basically the same
-  - [ ] maybe use `Fin n \to Nat` for indices, rather than lists? We're now using both
+- [ ] use either `IndexSet` or `IndexFnSet`, but not both. E.g. the main theorem uses both...
+- [ ] (small) get rid of Experiments.ExperimentFunCast (imported in 2 places, but I don't think it needs to be)
+- [ ] use `Fin` from `Mathlib.Data.Fin.Basic` instead of `NatLt`; it is basically the same
+- [ ] maybe use `Fin n \to Nat` for indices, rather than lists? We're now using both
 
-- how should you use the equivalence? should you use `.toFun` and `.invFun`? I think you probably shouldn't, but sometimes `simp` produces it, and then it's difficult to get rid of, making rewrites that don't involve `.toFun`/`.invFun` difficult
-  - I think I should try to stick to the version without `.toFun` and `.invFun`
 
 ## Development
 
-No CI for now. Run `lake build` to check if all relevants files can be built.
+Run `lake build` to check if all relevants files can be built.
