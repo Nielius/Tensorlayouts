@@ -7,7 +7,7 @@ Inspired by a [tinygrad](https://github.com/tinygrad/tinygrad) [bounty](https://
 
 ## Motivation
 
-You can do all kinds of operations on tensor: squeeze/unsqueeze, merging/splitting dimensions, transposing, splicing, etc.
+You can do all kinds of operations on tensors in frameworks like Pytorch or tinygrad: squeeze/unsqueeze, merging/splitting dimensions, transposing, splicing, etc.
 For some of these operations, you don't need to change the underlying memory (that could be expensive),
 and you can express the result as a "view", defined by a shape and a stride.
 However, if you combine these operations in certain ways, you sometimes can not represent the
