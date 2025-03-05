@@ -1,0 +1,41 @@
+# Copied from https://github.com/katydid/regex-deriv-lean/blob/main/.github/workflows/check_proofs.yml
+# Build and run all the samples.
+name: Check Proofs
+
+# Controls when the workflow will run
+on: [push, pull_request]
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - uses: actions/checkout@v3
+
+      - name: Set environment variables
+        run: |
+          echo "CACHE_BIN=$GITHUB_WORKSPACE/.cache/bin" >> $GITHUB_ENV
+          echo "$GITHUB_WORKSPACE/.cache/bin" >> $GITHUB_PATH
+
+      - name: Setup elan toolchain on Linux
+        run: |
+          curl -O --location https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh
+          chmod u+x elan-init.sh
+          ./elan-init.sh -y --default-toolchain leanprover/lean4:v4.14.0
+          echo "Adding location $HOME/.elan/bin to PATH..."
+          echo "$HOME/.elan/bin" >> $GITHUB_PATH
+
+      - name: Test elan & lean are working
+        run: |
+          elan --version
+          lean --version
+
+      - name: Fetch mathlib cache
+        run: |
+          lake exe cache get
+
+      - name: Build
+        run: |
+          lake build
