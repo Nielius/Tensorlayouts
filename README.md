@@ -7,7 +7,22 @@ Inspired by a [tinygrad](https://github.com/tinygrad/tinygrad) [bounty](https://
 
 ## Motivation
 
-TODO (main reason: no need to rearrange memory)
+You can do all kinds of operations on tensor: squeeze/unsqueeze, merging/splitting dimensions, transposing, splicing, etc.
+For some of these operations, you don't need to change the underlying memory (that could be expensive),
+and you can express the result as a "view", defined by a shape and a stride.
+However, if you combine these operations in certain ways, you sometimes can not represent the
+result as a single view anymore, and you would need to change the memory layout
+(or leave the computation implicit/use lazy evaluation; tinygrad uses Shapetrackers to represent
+an arbitrary composition of views).
+The goal of this repo is to prove in Lean necessary and sufficient conditions for when you can merge two arbitrary views.
+
+See [this explanation](doc/problem-formalization.md) for a more formal description of this problem.
+
+To understand more about strides and shapes in Pytorch (and other frameworks),
+see for example
+[ezyang's blog on Pytorch internals](http://blog.ezyang.com/2019/05/pytorch-internals/)
+or [this other blog post](https://martinlwx.github.io/en/how-to-reprensent-a-tensor-or-ndarray/).
+
 
 ## Statement
 
@@ -56,7 +71,7 @@ Some remarks on this statement:
 
 ## Next steps and todos
 
-- [ ] write up the formalization in [this markdown file](doc/problem-formalization.md)
+- [ ] use Lean's auto-generated docs
 - [ ] fill in all the gaps (there are some `sorry`s left)
 - [ ] incorporate offsets and masks
 - [ ] include theorem on merging more than 2 views (I think the statement will be basically the same: the composition of all functions should still satisfy the requirement when you increase an index component) 
