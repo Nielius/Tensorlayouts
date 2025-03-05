@@ -19,14 +19,19 @@ which is going to be the stride of the merged tensor view.
 
 Let's first recall the definition:
 $v_1$ and $v_2$ can be merged if the function
-`v1.to_unraveled_index_fn ∘ v2.index_fn` can be expressed as `v.index_fn`,
+`v1.index_fn ∘ unravel v1.shape ∘ v2.index_fn` can be expressed as `v.index_fn`,
 where `v` is a view with shape $(s)$ (the same shape as $v_2$) and some stride $(\sigma)$.
 The index function is the function that maps an index in the tensor to its position in memory
 (this is the inner product with the stride),
 and the unraveled index function is that same function, but precomposed with the unravel function
 `Nat -> IndexSet v1.shape`. See the main [README](../README.md) for a more elaborate explanation.
 
-Let's now do the calculations in our example.
+Let's now do the calculations for our example.
+This means that for every $0 \leq i < s$,
+we are first going to calculate `(unravel v1.shape ∘ v2.index_fn) i`,
+i.e., which index $(i_1, i_2, i_3)$ in the tensor `v1` corresponds to index `i` in `v2`.
+Then we are going to calculate `v1.index_fn` of that tensor,
+which gives us the position in memory.
 
 Suppose first that the shape of $v_2$ is 4, so that we have the indices $i = 0, 1,2,3$.
 For example, if $i = 1$, then the index function of $v_2$ gives 4 (because the stride is 4),
